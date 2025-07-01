@@ -1,0 +1,53 @@
+<html lang="en"><head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title></title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #phaser-example {
+           height: 600px;
+           width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div id="phaser-example"></div>
+    <script crossorigin="" src="https://cdn.jsdelivr.net/npm/phaser@3.85.2/dist/phaser.min.js"></script>
+    <script type="module">
+
+import { Preloader } from './Preloader.js';
+import { Play } from './Play.js';
+
+const config = {
+    title: 'Card Memory Game',
+    type: Phaser.AUTO,
+    backgroundColor: "#000046",
+    width: 300,
+    height: 600,
+    parent: "phaser-example",
+    scale: {
+        mode: Phaser.Scale.RESIZE,       // <- Permite que Phaser se adapte al contenedor
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        resizeTo: document.getElementById('phaser-example')
+    },
+    scene: [
+        Preloader,
+        Play
+    ]
+};
+
+new Phaser.Game(config);
+
+    </script>
+
+
+</body></html>
