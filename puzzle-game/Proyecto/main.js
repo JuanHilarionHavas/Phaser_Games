@@ -27,32 +27,30 @@ function create() {
   const margin = 5;
 
   let tileSize = Math.min(
-    (areaWidth - 2 * margin) / boardSize,
-    (areaHeight - 2 * margin) / boardSize
+    areaWidth / boardSize,
+    areaHeight / boardSize
   );
-  tileSize = Math.floor(tileSize);
+  tileSize = Math.floor(tileSize) - margin;
+
+  const offsetX = (areaWidth - (boardSize * tileSize)) / 2 + margin;
+  const offsetY = gapTop + (areaHeight - (boardSize * tileSize)) / 2 + margin;
 
   this.add.image(150, 300, 'background')
     .setDisplaySize(300, 600)
     .setAlpha(0.3);
 
-  let positions = Phaser.Utils.Array.NumberArray(0, boardSize * boardSize - 2);
-  positions.push(null);
-  Phaser.Utils.Array.Shuffle(positions);
-
   this.tiles = [];
-  this.positions = positions;
-
   this.moves = 0;
   this.movesText = this.add.text(150, 20, 'Movimientos: 0', {
     font: '20px Arial',
     fill: '#fff'
   }).setOrigin(0.5);
 
-  const offsetX = (areaWidth - boardSize * tileSize) / 2 + margin;
-  const offsetY = gapTop + (areaHeight - boardSize * tileSize) / 2 + margin;
+  // Iniciar con los tiles ordenados
+  this.positions = Phaser.Utils.Array.NumberArray(0, boardSize * boardSize - 2);
+  this.positions.push(null);
 
-  positions.forEach((value, index) => {
+  this.positions.forEach((value, index) => {
     const row = Math.floor(index / boardSize);
     const col = index % boardSize;
     const x = offsetX + col * tileSize + tileSize / 2;
@@ -60,13 +58,44 @@ function create() {
 
     if (value !== null) {
       const tile = this.add.sprite(x, y, 'tiles', value)
-        .setDisplaySize(tileSize, tileSize)
+        .setDisplaySize(tileSize * 0.8, tileSize * 0.8)
+        .setAlpha(0)
         .setInteractive();
       tile.value = value;
       tile.pos = index;
       tile.on('pointerdown', () => tryMove.call(this, tile, tileSize, offsetX, offsetY));
       this.tiles.push(tile);
+
+      this.tweens.add({
+        targets: tile,
+        displayWidth: tileSize,
+        displayHeight: tileSize,
+        alpha: 1,
+        duration: 300,
+        delay: index * 50
+      });
     }
+  });
+
+  // Luego del efecto inicial, desordenar
+  this.time.delayedCall(1000 + this.tiles.length * 50, () => {
+    this.positions = Phaser.Utils.Array.NumberArray(0, boardSize * boardSize - 2);
+    this.positions.push(null);
+    Phaser.Utils.Array.Shuffle(this.positions);
+
+    this.tiles.forEach(tile => {
+      let newIndex = this.positions.indexOf(tile.value);
+      tile.pos = newIndex;
+      const newRow = Math.floor(newIndex / boardSize);
+      const newCol = newIndex % boardSize;
+
+      this.tweens.add({
+        targets: tile,
+        x: offsetX + newCol * tileSize + tileSize / 2,
+        y: offsetY + newRow * tileSize + tileSize / 2,
+        duration: 300
+      });
+    });
   });
 
   this.solvePuzzle = () => {
@@ -101,7 +130,6 @@ function create() {
       fill: '#fff'
     }).setOrigin(0.5);
 
-    // Phaser 3.60+ compatible
     this.add.particles(150, 0, 'particle', {
       speedY: { min: 100, max: 200 },
       lifespan: 2000,
