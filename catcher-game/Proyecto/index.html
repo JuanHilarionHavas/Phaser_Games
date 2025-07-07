@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catcher Game</title>
+  <link href="https://fonts.googleapis.com/css?family=Luckiest+Guy&display=swap" rel="stylesheet">
+<style>
+    body, canvas {
+      font-family: 'Luckiest Guy', cursive;
+    }
+    body { margin: 0; background: #1a1a1a; }
+    canvas { display: block; margin: auto; }
+  </style>
+</head>
+<body>
+  <script>
+    // config.js
+  window.GAME_CONFIG = {
+    player: {
+      spriteSheet: "player",
+      path: "assets/player.png",
+      frameWidth: 144,
+      frameHeight: 196,
+      initialPosition: {
+        x: 150,
+        y: 570,
+      },
+      scale: 0.5,
+      initialFrame: 2,
+      animations: {
+        active: true,
+        left: { active: true, start: 0, end: 1 },
+        forward: 2,
+        right: { active: true, start: 3, end: 4 }
+      }
+    },
+    items: {
+      path: "assets/",
+      good: ["item1", "item2", "item3", "item4"],
+      bad: ["baditem1", "baditem2"]
+    },
+    spawn: {
+      initialDelay: 800,
+      minDelay: 300,
+      decrease: 20,
+      initialFallSpeed: 100,
+      maxFallSpeed: 300,
+      increase: 8,
+      difficultyScoreStep: 15,
+      difficultyTimeStep: 10
+    },
+    background: {
+      key: "bg",
+      path: "assets/bg.png",
+      parallax: { x: 0.2, y: 0.5 }
+    },
+    ui: {
+      pop: {
+        fontSize: "24px",
+        colorGood: "#00ff00",
+        colorBad: "darkred",
+        bounce: { y: -40, duration: 600, ease: "Bounce.easeOut" },
+        goodItems: 1,
+        badItems: 2,
+      },
+      font: "16px",
+      color: "#fff",
+      scoreText: { x: 10, y: 10, label: "Quesos: " },
+      timerText: { x: 180, y: 10, label: "Tiempo: " },
+      learnMoreUrl: "https://mexico.littlecaesars.com/es-mx/",
+      endTitle: { fontSize: "24px", text: "Se acabo el tiempo!", offsetY: -50 },
+      endText: { fontSize: "18px", text: "Atrapaste: ", offsetY: 0 },
+      buttonText: { text: "Learn More", fontSize: "16px" }
+    }
+  };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script src="main.js"></script>
+  <script>
+  const config = {
+    type: Phaser.AUTO,
+    width: 300,
+    height: 600,
+    backgroundColor: "#143469",
+    scene: [MainScene],
+    physics: {
+      default: "arcade",
+      arcade: {
+        gravity: { y: 200 },
+        debug: false
+      }
+    }
+  };
+
+const game = new Phaser.Game(config);
+  </script>
+</body>
+</html>
