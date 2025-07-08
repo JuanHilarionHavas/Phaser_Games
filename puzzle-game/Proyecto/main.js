@@ -21,10 +21,10 @@ function preload() {
 
 function create() {
   const boardSize = 3;
-  const areaWidth = 290;
-  const areaHeight = 290;
-  const gapTop = 100;
-  const margin = 5;
+  const areaWidth = 300;
+  const areaHeight = 300;
+  const gapTop = 200;
+  const margin = 0;
 
   let tileSize = Math.min(
     areaWidth / boardSize,
@@ -41,7 +41,7 @@ function create() {
 
   this.tiles = [];
   this.moves = 0;
-  this.movesText = this.add.text(150, 20, 'Movimientos: 0', {
+  this.movesText = this.add.text(150, 450, 'Movimientos: 0', {
     font: '20px Arial',
     fill: '#fff'
   }).setOrigin(0.5);
@@ -78,7 +78,7 @@ function create() {
   });
 
   // Luego del efecto inicial, desordenar
-  this.time.delayedCall(1000 + this.tiles.length * 50, () => {
+  this.time.delayedCall(2500 + this.tiles.length * 50, () => {
     this.positions = Phaser.Utils.Array.NumberArray(0, boardSize * boardSize - 2);
     this.positions.push(null);
     Phaser.Utils.Array.Shuffle(this.positions);
