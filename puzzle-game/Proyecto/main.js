@@ -14,6 +14,11 @@ window.onload = function() {
 function preload() {
   this.load.image('puzzle', 'img/puzzle_image.png');
   this.load.image('particle', 'img/particle.png');
+  this.load.plugin(
+    'rexoutlinepipelineplugin',                // clave en minúsculas
+    'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexoutlinepipelineplugin.min.js',
+    true
+  );
 }
 
 function create() {
@@ -93,12 +98,14 @@ function create() {
           .setAlpha(0)
           .setInteractive();
 
-        tile.preFX.addShadow(2, 2, 0.1, 1, 0x000033, 6, 0.7);
+        // tile.preFX.addShadow(2, 2, 0.1, 1, 0x000033, 6, 0.7);
+        // tile.preFX.setPadding(5);
 
-        tile.preFX.setPadding(4);
-        const fxGlow = tile.preFX.addGlow(0xffffff, 1, 0, false);
-        this.input.on('pointerover', () => fxGlow.setActive(true));
-        this.input.on('pointerout', () => fxGlow.setActive(false));
+        const outline = this.plugins.get('rexoutlinepipelineplugin').add(tile, {
+          thickness: 2,
+          outlineColor: 0x000000,
+          quality: 1
+        });
 
         tile.value = value;
         tile.pos = index;
