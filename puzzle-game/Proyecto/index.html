@@ -4,9 +4,29 @@
   <meta charset="UTF-8">
   <title>Puzzle 3x3</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
-  <style>body, html { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f0f0; }</style>
+  <style>
+  body, html { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: black; } 
+  
+  canvas{ border: 1px solid white; }
+
+  div#movimientos {
+    position: absolute;
+    color: white;
+    bottom: 300px;
+  }
+
+  div#estado {
+    position: absolute;
+    color: white;
+    top: 250px;
+  }
+
+  </style>
 </head>
 <body>
+  <div id="game_container"></div>
+  <div id="estado"></div>
+  <div id="movimientos"></div>
   <script src="./main.js"></script>
 </body>
 </html>

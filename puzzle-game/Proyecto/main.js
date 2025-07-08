@@ -3,7 +3,8 @@ window.onload = function() {
     type: Phaser.AUTO,
     width: 300,
     height: 600,
-    backgroundColor: '#222',
+    transparent: true,
+    parent: 'game_container', // renderiza el canvas dentro de #game_container
     scene: { preload, create }
   };
   
@@ -11,124 +12,174 @@ window.onload = function() {
 };
 
 function preload() {
-  this.load.spritesheet('tiles', 'img/tiles_spritesheet.png', {
-    frameWidth: 128,
-    frameHeight: 128
-  });
-  this.load.image('background', 'img/background.jpg');
+  this.load.image('puzzle', 'img/puzzle_image.png');
   this.load.image('particle', 'img/particle.png');
 }
 
 function create() {
-  const boardSize = 3;
-  const areaWidth = 300;
-  const areaHeight = 300;
-  const gapTop = 200;
-  const margin = 0;
+  this.boardSize = 3;
+  this.areaWidth = 295;
+  this.areaHeight = 295;
+  this.gapTop = 130;
+  this.margin = 2.5;
 
-  let tileSize = Math.min(
-    areaWidth / boardSize,
-    areaHeight / boardSize
-  );
-  tileSize = Math.floor(tileSize) - margin;
+  const sourceImage = this.textures.get('puzzle').getSourceImage();
+  const imgWidth = sourceImage.width;
+  const imgHeight = sourceImage.height;
 
-  const offsetX = (areaWidth - (boardSize * tileSize)) / 2 + margin;
-  const offsetY = gapTop + (areaHeight - (boardSize * tileSize)) / 2 + margin;
+  const sliceW = Math.floor(imgWidth / this.boardSize);
+  const sliceH = Math.floor(imgHeight / this.boardSize);
 
-  this.add.image(150, 300, 'background')
-    .setDisplaySize(300, 600)
-    .setAlpha(0.3);
-
-  this.tiles = [];
-  this.moves = 0;
-  this.movesText = this.add.text(150, 450, 'Movimientos: 0', {
-    font: '20px Arial',
-    fill: '#fff'
-  }).setOrigin(0.5);
-
-  // Iniciar con los tiles ordenados
-  this.positions = Phaser.Utils.Array.NumberArray(0, boardSize * boardSize - 2);
-  this.positions.push(null);
-
-  this.positions.forEach((value, index) => {
-    const row = Math.floor(index / boardSize);
-    const col = index % boardSize;
-    const x = offsetX + col * tileSize + tileSize / 2;
-    const y = offsetY + row * tileSize + tileSize / 2;
-
-    if (value !== null) {
-      const tile = this.add.sprite(x, y, 'tiles', value)
-        .setDisplaySize(tileSize * 0.8, tileSize * 0.8)
-        .setAlpha(0)
-        .setInteractive();
-      tile.value = value;
-      tile.pos = index;
-      tile.on('pointerdown', () => tryMove.call(this, tile, tileSize, offsetX, offsetY));
-      this.tiles.push(tile);
-
-      this.tweens.add({
-        targets: tile,
-        displayWidth: tileSize,
-        displayHeight: tileSize,
-        alpha: 1,
-        duration: 300,
-        delay: index * 50
-      });
+  let frame = 0;
+  for (let row = 0; row < this.boardSize; row++) {
+    for (let col = 0; col < this.boardSize; col++) {
+      if (!(row === this.boardSize - 1 && col === this.boardSize -1)) {
+        this.textures.addCanvas(`tile_${frame}`, (() => {
+          const canvas = this.textures.createCanvas(`tile_canvas_${frame}`, sliceW, sliceH).getCanvas();
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(sourceImage, col * sliceW, row * sliceH, sliceW, sliceH, 0, 0, sliceW, sliceH);
+          return canvas;
+        })());
+        frame++;
+      }
     }
-  });
+  }
 
-  // Luego del efecto inicial, desordenar
-  this.time.delayedCall(2500 + this.tiles.length * 50, () => {
-    this.positions = Phaser.Utils.Array.NumberArray(0, boardSize * boardSize - 2);
+  this.tileSize = Math.min(this.areaWidth / this.boardSize, this.areaHeight / this.boardSize);
+  this.tileSize = Math.floor(this.tileSize) - this.margin;
+
+  this.offsetX = (this.areaWidth - (this.boardSize * this.tileSize)) / 2 + this.margin;
+  this.offsetY = this.gapTop + (this.areaHeight - (this.boardSize * this.tileSize)) / 2 + this.margin;
+
+  this.add.image(
+    this.offsetX + (this.boardSize * this.tileSize) / 2,
+    this.offsetY + (this.boardSize * this.tileSize) / 2,
+    'puzzle'
+  ).setAlpha(0.3)
+   .setDisplaySize(this.areaWidth, this.areaHeight);
+
+  // Referencias al HTML externo
+  const movimientosEl = document.getElementById("movimientos");
+  const estadoEl = document.getElementById("estado");
+
+  this.moves = 0;
+  movimientosEl.textContent = "Movimientos: 0";
+  estadoEl.textContent = "";
+
+  this.createPuzzle = (boardSize, offsetX, offsetY, tileSize) => {
+    let totalTiles = boardSize * boardSize;
+    this.positions = Phaser.Utils.Array.NumberArray(0, totalTiles - 2);
     this.positions.push(null);
-    Phaser.Utils.Array.Shuffle(this.positions);
 
-    this.tiles.forEach(tile => {
-      let newIndex = this.positions.indexOf(tile.value);
-      tile.pos = newIndex;
-      const newRow = Math.floor(newIndex / boardSize);
-      const newCol = newIndex % boardSize;
+    if (this.tiles) {
+      this.tiles.forEach(t => t.destroy());
+    }
+    this.tiles = [];
 
-      this.tweens.add({
-        targets: tile,
-        x: offsetX + newCol * tileSize + tileSize / 2,
-        y: offsetY + newRow * tileSize + tileSize / 2,
-        duration: 300
+    this.moves = 0;
+    movimientosEl.textContent = "Movimientos: 0";
+    estadoEl.textContent = "";
+
+    this.positions.forEach((value, index) => {
+      const row = Math.floor(index / boardSize);
+      const col = index % boardSize;
+      const x = offsetX + col * tileSize + tileSize / 2;
+      const y = offsetY + row * tileSize + tileSize / 2;
+
+      if (value !== null) {
+
+        const tile = this.add.image(x, y, `tile_${value}`)
+          .setDisplaySize(tileSize, tileSize)
+          .setAlpha(0)
+          .setInteractive();
+
+        tile.preFX.addShadow(2, 2, 0.1, 1, 0x000033, 6, 0.7);
+
+        tile.preFX.setPadding(4);
+        const fxGlow = tile.preFX.addGlow(0xffffff, 1, 0, false);
+        this.input.on('pointerover', () => fxGlow.setActive(true));
+        this.input.on('pointerout', () => fxGlow.setActive(false));
+
+        tile.value = value;
+        tile.pos = index;
+        tile.on('pointerdown', () => tryMove.call(this, tile, tileSize, offsetX, offsetY));
+        this.tiles.push(tile);
+
+        this.tweens.add({
+          targets: tile,
+          alpha: 1,
+          duration: 300,
+          delay: index * 50
+        });
+      }
+    });
+
+    this.time.delayedCall(2000 + this.tiles.length * 50, () => {
+      this.positions = Phaser.Utils.Array.NumberArray(0, totalTiles - 2);
+      this.positions.push(null);
+      Phaser.Utils.Array.Shuffle(this.positions);
+
+      this.tiles.forEach(tile => {
+        let newIndex = this.positions.indexOf(tile.value);
+        tile.pos = newIndex;
+        const newRow = Math.floor(newIndex / boardSize);
+        const newCol = newIndex % boardSize;
+
+        this.tweens.add({
+          targets: tile,
+          x: offsetX + newCol * tileSize + tileSize / 2,
+          y: offsetY + newRow * tileSize + tileSize / 2,
+          duration: 300
+        });
       });
     });
-  });
+  }
+  this.createPuzzle(this.boardSize, this.offsetX, this.offsetY, this.tileSize);
 
-  this.solvePuzzle = () => {
-    this.positions = Phaser.Utils.Array.NumberArray(0, boardSize * boardSize - 2);
+  this.solvePuzzle = (goodTry = false) => {
+    let totalTiles = this.boardSize * this.boardSize;
+    this.positions = Phaser.Utils.Array.NumberArray(0, totalTiles - 2);
     this.positions.push(null);
 
     this.tiles.forEach(tile => {
       let finalIndex = this.positions.indexOf(tile.value);
       tile.pos = finalIndex;
-      const row = Math.floor(finalIndex / boardSize);
-      const col = finalIndex % boardSize;
+      const row = Math.floor(finalIndex / this.boardSize);
+      const col = finalIndex % this.boardSize;
       this.tweens.add({
         targets: tile,
-        x: offsetX + col * tileSize + tileSize / 2,
-        y: offsetY + row * tileSize + tileSize / 2,
+        x: this.offsetX + col * this.tileSize + this.tileSize / 2,
+        y: this.offsetY + row * this.tileSize + this.tileSize / 2,
         duration: 300
       });
     });
-    this.time.delayedCall(350, () => triggerWin.call(this));
+    this.time.delayedCall(350, () => triggerWin.call(this, goodTry));
   };
 
   this.checkWin = () => {
-    const correct = Phaser.Utils.Array.NumberArray(0, boardSize * boardSize - 2).concat([null]);
+    let totalTiles = this.boardSize * this.boardSize;
+    const correct = Phaser.Utils.Array.NumberArray(0, totalTiles - 2).concat([null]);
     if (JSON.stringify(this.positions) === JSON.stringify(correct)) {
-      triggerWin.call(this);
+      triggerWin.call(this, false);
     }
   };
 
-  function triggerWin() {
-    this.add.text(150, 50, '¡Ganaste!', {
-      font: '28px Arial',
-      fill: '#fff'
-    }).setOrigin(0.5);
+    function triggerWin(goodTry) {
+    estadoEl.textContent = goodTry ? "¡Buen intento!" : "¡Ganaste!";
+
+    // Fondo encima con fade
+    const fg = this.add.image(
+      this.offsetX + (this.boardSize * this.tileSize) / 2,
+      this.offsetY + (this.boardSize * this.tileSize) / 2,
+      'puzzle'
+      ).setAlpha(0)
+      .setDisplaySize(this.areaWidth, this.areaHeight);
+
+    this.tweens.add({
+      targets: fg,
+      alpha: 1,
+      duration: 1000
+    });
 
     this.add.particles(150, 0, 'particle', {
       speedY: { min: 100, max: 200 },
@@ -141,11 +192,12 @@ function create() {
     });
   }
 
+
   this.triggerWin = triggerWin;
 }
 
 function tryMove(tile, tileSize, offsetX, offsetY) {
-  const boardSize = 3;
+  const boardSize = Math.sqrt(this.positions.length);
   const blankIndex = this.positions.indexOf(null);
   const tileIndex = tile.pos;
 
@@ -160,7 +212,11 @@ function tryMove(tile, tileSize, offsetX, offsetY) {
     tile.pos = blankIndex;
 
     this.moves += 1;
-    this.movesText.setText('Movimientos: ' + this.moves);
+    document.getElementById("movimientos").textContent = "Movimientos: " + this.moves;
+
+    if (this.moves >= 250) {
+      this.solvePuzzle(true); // goodTry=true
+    }
 
     this.tweens.add({
       targets: tile,
