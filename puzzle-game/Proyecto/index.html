@@ -12,13 +12,13 @@
   div#movimientos {
     position: absolute;
     color: white;
-    bottom: 300px;
+    bottom: 270px;
   }
 
   div#estado {
     position: absolute;
     color: white;
-    top: 250px;
+    top: 220px;
   }
 
   </style>
@@ -27,6 +27,78 @@
   <div id="game_container"></div>
   <div id="estado"></div>
   <div id="movimientos"></div>
+  <script>
+  window.GAME_CONFIG = {
+    assets: {
+      puzzle: 'img/puzzle_image.png',
+      particle: 'img/particle.png'
+    },
+    selectors: {
+      moves: '#movimientos',
+      status: '#estado'
+    },
+    labels: {
+      movesPrefix: 'Movimientos',
+      winText: '¡Ganaste!',
+      tryAgainText: '¡Buen intento!'
+    },
+    boardSize: 3,
+    areaWidth: 295,
+    areaHeight: 295,
+    gapTop: 130,
+    margin: 2,
+    initialDelayPerTile: 50,
+    initialShuffleDelay: 2000,
+    outline: { 
+      enabled: true, 
+      thickness: 3, 
+      color: 0x000000, 
+      quality: 1 
+    },
+    glow: { 
+      enabled: true, 
+      color: 0x000000, 
+      outerStrength: 0, 
+      innerStrength: 1, 
+      padding: 4 
+    },
+    solveMoveLimit: 200,
+    fadeDuration: 1000,
+    showParticles: true,
+    particles: {
+        speedY: { min: 100, max: 200 },
+        lifespan: 2000,
+        quantity: 5,
+        scale: { start: 0.2, end: 0 },
+        angle: { min: 0, max: 360 },
+        frequency: 100,
+        emitZone: {
+          type: 'random',
+          source: new Phaser.Geom.Rectangle(-150, 0, 300, 1)
+        }
+    },
+    endCallback: {
+      delay: 1000,
+      page: 'page1_2',
+      type: 'fade',
+      delay: 2000,
+    }
+  };
+  </script>
   <script src="./main.js"></script>
+  <script>
+  
+  const phaserConfig = {
+    type: Phaser.AUTO,
+    width: 300,
+    height: 600,
+    transparent: true,
+    parent: 'game_container',
+    scene: { preload, create }
+  };
+
+  window.game = new Phaser.Game(phaserConfig);
+
+  </script>
 </body>
 </html>

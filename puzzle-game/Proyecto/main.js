@@ -1,236 +1,205 @@
-window.onload = function() {
-  const config = {
-    type: Phaser.AUTO,
-    width: 300,
-    height: 600,
-    transparent: true,
-    parent: 'game_container', // renderiza el canvas dentro de #game_container
-    scene: { preload, create }
-  };
-  
-  window.game = new Phaser.Game(config);
-};
+const cfg = window.GAME_CONFIG;
 
 function preload() {
-  this.load.image('puzzle', 'img/puzzle_image.png');
-  this.load.image('particle', 'img/particle.png');
+  
+  this.load.image('puzzle', cfg.assets.puzzle);
+  this.load.image('particle', cfg.assets.particle);
   this.load.plugin(
-    'rexoutlinepipelineplugin',                // clave en minúsculas
+    'rexoutlinepipelineplugin',
     'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexoutlinepipelineplugin.min.js',
     true
   );
 }
 
 function create() {
-  this.boardSize = 3;
-  this.areaWidth = 295;
-  this.areaHeight = 295;
-  this.gapTop = 130;
-  this.margin = 2.5;
+  const {
+    selectors: { moves: movesSel, status: statusSel },
+    labels: { movesPrefix, winText, tryAgainText },
+    boardSize, areaWidth, areaHeight, gapTop, margin,
+    initialDelayPerTile, initialShuffleDelay,
+    outline, glow,fadeDuration,
+    showParticles, particles
+  } = cfg;
 
-  const sourceImage = this.textures.get('puzzle').getSourceImage();
-  const imgWidth = sourceImage.width;
-  const imgHeight = sourceImage.height;
+  const movEl = document.querySelector(movesSel);
+  const statEl = document.querySelector(statusSel);
 
-  const sliceW = Math.floor(imgWidth / this.boardSize);
-  const sliceH = Math.floor(imgHeight / this.boardSize);
+  const source = this.textures.get('puzzle').getSourceImage();
+  const sliceW = Math.floor(source.width / boardSize);
+  const sliceH = Math.floor(source.height / boardSize);
 
-  let frame = 0;
-  for (let row = 0; row < this.boardSize; row++) {
-    for (let col = 0; col < this.boardSize; col++) {
-      if (!(row === this.boardSize - 1 && col === this.boardSize -1)) {
-        this.textures.addCanvas(`tile_${frame}`, (() => {
-          const canvas = this.textures.createCanvas(`tile_canvas_${frame}`, sliceW, sliceH).getCanvas();
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(sourceImage, col * sliceW, row * sliceH, sliceW, sliceH, 0, 0, sliceW, sliceH);
-          return canvas;
-        })());
-        frame++;
-      }
+  for (let r = 0, frame = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      if (r === boardSize - 1 && c === boardSize - 1) continue;
+      const key = `tile_${frame}`;
+      const canvasTex = this.textures.createCanvas(key, sliceW, sliceH);
+      canvasTex.getContext().drawImage(source, c * sliceW, r * sliceH, sliceW, sliceH, 0, 0, sliceW, sliceH);
+      canvasTex.refresh();
+      frame++;
     }
   }
 
-  this.tileSize = Math.min(this.areaWidth / this.boardSize, this.areaHeight / this.boardSize);
-  this.tileSize = Math.floor(this.tileSize) - this.margin;
-
-  this.offsetX = (this.areaWidth - (this.boardSize * this.tileSize)) / 2 + this.margin;
-  this.offsetY = this.gapTop + (this.areaHeight - (this.boardSize * this.tileSize)) / 2 + this.margin;
+  this.tileSize = Math.floor(Math.min(areaWidth, areaHeight) / boardSize) - margin;
+  this.offsetX = (areaWidth - boardSize * this.tileSize) / 2 + margin;
+  this.offsetY = gapTop + (areaHeight - boardSize * this.tileSize) / 2 + margin;
 
   this.add.image(
-    this.offsetX + (this.boardSize * this.tileSize) / 2,
-    this.offsetY + (this.boardSize * this.tileSize) / 2,
+    this.offsetX + (boardSize * this.tileSize) / 2,
+    this.offsetY + (boardSize * this.tileSize) / 2,
     'puzzle'
-  ).setAlpha(0.3)
-   .setDisplaySize(this.areaWidth, this.areaHeight);
-
-  // Referencias al HTML externo
-  const movimientosEl = document.getElementById("movimientos");
-  const estadoEl = document.getElementById("estado");
+  ).setAlpha(0.3).setDisplaySize(areaWidth, areaHeight);
 
   this.moves = 0;
-  movimientosEl.textContent = "Movimientos: 0";
-  estadoEl.textContent = "";
+  movEl.textContent = `${movesPrefix}: 0`;
+  statEl.textContent = '';
 
-  this.createPuzzle = (boardSize, offsetX, offsetY, tileSize) => {
-    let totalTiles = boardSize * boardSize;
-    this.positions = Phaser.Utils.Array.NumberArray(0, totalTiles - 2);
+  this.createPuzzle = () => {
+    const total = boardSize * boardSize;
+    this.positions = Phaser.Utils.Array.NumberArray(0, total - 2);
     this.positions.push(null);
 
-    if (this.tiles) {
-      this.tiles.forEach(t => t.destroy());
-    }
+    this.tiles?.forEach(t => t.destroy());
     this.tiles = [];
-
     this.moves = 0;
-    movimientosEl.textContent = "Movimientos: 0";
-    estadoEl.textContent = "";
+    movEl.textContent = `${movesPrefix}: 0`;
+    statEl.textContent = '';
 
-    this.positions.forEach((value, index) => {
-      const row = Math.floor(index / boardSize);
-      const col = index % boardSize;
-      const x = offsetX + col * tileSize + tileSize / 2;
-      const y = offsetY + row * tileSize + tileSize / 2;
+    this.positions.forEach((v, idx) => {
+      if (v === null) return;
+      const row = Math.floor(idx / boardSize),
+            col = idx % boardSize,
+            x = this.offsetX + col * this.tileSize + this.tileSize / 2,
+            y = this.offsetY + row * this.tileSize + this.tileSize / 2;
+      const tile = this.add.image(x, y, `tile_${v}`)
+        .setDisplaySize(this.tileSize, this.tileSize)
+        .setInteractive();
 
-      if (value !== null) {
-
-        const tile = this.add.image(x, y, `tile_${value}`)
-          .setDisplaySize(tileSize, tileSize)
-          .setAlpha(0)
-          .setInteractive();
-
-        // tile.preFX.addShadow(2, 2, 0.1, 1, 0x000033, 6, 0.7);
-        // tile.preFX.setPadding(5);
-
-        const outline = this.plugins.get('rexoutlinepipelineplugin').add(tile, {
-          thickness: 2,
-          outlineColor: 0x000000,
-          quality: 1
-        });
-
-        tile.value = value;
-        tile.pos = index;
-        tile.on('pointerdown', () => tryMove.call(this, tile, tileSize, offsetX, offsetY));
-        this.tiles.push(tile);
-
-        this.tweens.add({
-          targets: tile,
-          alpha: 1,
-          duration: 300,
-          delay: index * 50
+      if (outline.enabled) {
+        this.plugins.get('rexoutlinepipelineplugin').add(tile, {
+          thickness: outline.thickness,
+          outlineColor: outline.color,
+          quality: outline.quality
         });
       }
-    });
 
-    this.time.delayedCall(2000 + this.tiles.length * 50, () => {
-      this.positions = Phaser.Utils.Array.NumberArray(0, totalTiles - 2);
-      this.positions.push(null);
-      Phaser.Utils.Array.Shuffle(this.positions);
+      if (glow.enabled) {
+        tile.preFX.setPadding(glow.padding);
+        const fx = tile.preFX.addGlow(
+          glow.color, glow.outerStrength, glow.innerStrength, false
+        );
+        fx.setActive(false);
+        tile.on('pointerover', () => fx.setActive(true));
+        tile.on('pointerout', () => fx.setActive(false));
+      }
 
-      this.tiles.forEach(tile => {
-        let newIndex = this.positions.indexOf(tile.value);
-        tile.pos = newIndex;
-        const newRow = Math.floor(newIndex / boardSize);
-        const newCol = newIndex % boardSize;
+      tile.value = v;
+      tile.pos = idx;
+      tile.on('pointerdown', () => tryMove.call(this, tile));
+      this.tiles.push(tile);
 
-        this.tweens.add({
-          targets: tile,
-          x: offsetX + newCol * tileSize + tileSize / 2,
-          y: offsetY + newRow * tileSize + tileSize / 2,
-          duration: 300
-        });
-      });
-    });
-  }
-  this.createPuzzle(this.boardSize, this.offsetX, this.offsetY, this.tileSize);
-
-  this.solvePuzzle = (goodTry = false) => {
-    let totalTiles = this.boardSize * this.boardSize;
-    this.positions = Phaser.Utils.Array.NumberArray(0, totalTiles - 2);
-    this.positions.push(null);
-
-    this.tiles.forEach(tile => {
-      let finalIndex = this.positions.indexOf(tile.value);
-      tile.pos = finalIndex;
-      const row = Math.floor(finalIndex / this.boardSize);
-      const col = finalIndex % this.boardSize;
       this.tweens.add({
         targets: tile,
+        alpha: 1,
+        duration: 300,
+        delay: idx * initialDelayPerTile
+      });
+    });
+
+    this.time.delayedCall(
+      initialShuffleDelay + this.tiles.length * initialDelayPerTile,
+      () => {
+        Phaser.Utils.Array.Shuffle(this.positions);
+        this.tiles.forEach(t => {
+          const ni = this.positions.indexOf(t.value),
+                row = Math.floor(ni / boardSize),
+                col = ni % boardSize;
+          t.pos = ni;
+          this.tweens.add({
+            targets: t,
+            x: this.offsetX + col * this.tileSize + this.tileSize / 2,
+            y: this.offsetY + row * this.tileSize + this.tileSize / 2,
+            duration: 300
+          });
+        });
+      }
+    );
+  };
+
+  this.solvePuzzle = (good) => {
+    const total = boardSize * boardSize;
+    this.positions = Phaser.Utils.Array.NumberArray(0, total - 2);
+    this.positions.push(null);
+
+    this.tiles.forEach(t => {
+      const ni = this.positions.indexOf(t.value),
+            row = Math.floor(ni / boardSize),
+            col = ni % boardSize;
+      t.pos = ni;
+      this.tweens.add({
+        targets: t,
         x: this.offsetX + col * this.tileSize + this.tileSize / 2,
         y: this.offsetY + row * this.tileSize + this.tileSize / 2,
         duration: 300
       });
     });
-    this.time.delayedCall(350, () => triggerWin.call(this, goodTry));
+
+    this.time.delayedCall(350, () => triggerWin.call(this, good));
   };
 
   this.checkWin = () => {
-    let totalTiles = this.boardSize * this.boardSize;
-    const correct = Phaser.Utils.Array.NumberArray(0, totalTiles - 2).concat([null]);
+    const total = boardSize * boardSize;
+    const correct = Phaser.Utils.Array.NumberArray(0, total - 2).concat([null]);
     if (JSON.stringify(this.positions) === JSON.stringify(correct)) {
       triggerWin.call(this, false);
     }
   };
 
-    function triggerWin(goodTry) {
-    estadoEl.textContent = goodTry ? "¡Buen intento!" : "¡Ganaste!";
+  const triggerWin = (good) => {
+    statEl.textContent = good ? tryAgainText : winText;
 
-    // Fondo encima con fade
     const fg = this.add.image(
-      this.offsetX + (this.boardSize * this.tileSize) / 2,
-      this.offsetY + (this.boardSize * this.tileSize) / 2,
+      this.offsetX + (boardSize * this.tileSize) / 2,
+      this.offsetY + (boardSize * this.tileSize) / 2,
       'puzzle'
-      ).setAlpha(0)
-      .setDisplaySize(this.areaWidth, this.areaHeight);
+    ).setAlpha(0).setDisplaySize(areaWidth, areaHeight);
 
-    this.tweens.add({
-      targets: fg,
-      alpha: 1,
-      duration: 1000
-    });
+    this.tweens.add({ targets: fg, alpha: 1, duration: fadeDuration });
 
-    this.add.particles(150, 0, 'particle', {
-      speedY: { min: 100, max: 200 },
-      lifespan: 2000,
-      quantity: 5,
-      scale: { start: 0.2, end: 0 },
-      angle: { min: 0, max: 360 },
-      frequency: 100,
-      emitZone: { type: 'random', source: new Phaser.Geom.Rectangle(-150, 0, 300, 1) }
-    });
-  }
-
+    if (showParticles) {
+      this.add.particles(150, 0, 'particle', particles);
+    }
+  };
 
   this.triggerWin = triggerWin;
+  this.createPuzzle();
 }
 
-function tryMove(tile, tileSize, offsetX, offsetY) {
-  const boardSize = Math.sqrt(this.positions.length);
-  const blankIndex = this.positions.indexOf(null);
-  const tileIndex = tile.pos;
+function tryMove(tile) {
+  const { boardSize, solveMoveLimit, selectors: { moves: movesSel }, labels: { movesPrefix } } = cfg;
+  const blank = this.positions.indexOf(null),
+        idx = tile.pos,
+        r1 = Math.floor(blank / boardSize),
+        c1 = blank % boardSize,
+        r2 = Math.floor(idx / boardSize),
+        c2 = idx % boardSize;
+  if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return;
 
-  const r1 = Math.floor(blankIndex / boardSize),
-        c1 = blankIndex % boardSize;
-  const r2 = Math.floor(tileIndex / boardSize),
-        c2 = tileIndex % boardSize;
+  this.positions[blank] = tile.value;
+  this.positions[idx] = null;
+  tile.pos = blank;
 
-  if (Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1) {
-    this.positions[blankIndex] = tile.value;
-    this.positions[tileIndex] = null;
-    tile.pos = blankIndex;
+  this.moves++;
+  document.querySelector(movesSel).textContent = `${movesPrefix}: ${this.moves}`;
 
-    this.moves += 1;
-    document.getElementById("movimientos").textContent = "Movimientos: " + this.moves;
-
-    if (this.moves >= 250) {
-      this.solvePuzzle(true); // goodTry=true
-    }
-
-    this.tweens.add({
-      targets: tile,
-      x: offsetX + c1 * tileSize + tileSize / 2,
-      y: offsetY + r1 * tileSize + tileSize / 2,
-      duration: 200,
-      onComplete: () => this.checkWin()
-    });
+  if (this.moves >= solveMoveLimit) {
+    this.solvePuzzle(true);
   }
+
+  this.tweens.add({
+    targets: tile,
+    x: this.offsetX + c1 * this.tileSize + this.tileSize / 2,
+    y: this.offsetY + r1 * this.tileSize + this.tileSize / 2,
+    duration: 200,
+    onComplete: () => this.checkWin()
+  });
 }

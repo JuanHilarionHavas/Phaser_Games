@@ -16,38 +16,29 @@
         #phaser-example {
            height: 600px;
            width: 300px;
+           background-color: rgb(27, 27, 166);
         }
     </style>
 </head>
 <body>
     <div id="phaser-example"></div>
-    <script crossorigin="" src="https://cdn.jsdelivr.net/npm/phaser@3.85.2/dist/phaser.min.js"></script>
-    <script type="module">
+    <script src="https://s0.2mdn.net/creatives/assets/5478760/phaser.min.js"></script>
+    <script src="main.js"></script>
+    <script>
+   const config = {
+        type: Phaser.AUTO,
+        width: 320,
+        height: 480,
+        transparent: true,
+        parent: "phaser-example",
+        backgroundColor: '#1d1d1d',
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+        scene: [Preloader, Play]
+    };
 
-import { Preloader } from './Preloader.js';
-import { Play } from './Play.js';
+    window.game = new Phaser.Game(config);
 
-const config = {
-    title: 'Card Memory Game',
-    type: Phaser.AUTO,
-    backgroundColor: "#000046",
-    width: 300,
-    height: 600,
-    parent: "phaser-example",
-    scale: {
-        mode: Phaser.Scale.RESIZE,       // <- Permite que Phaser se adapte al contenedor
-        autoCenter: Phaser.Scale.CENTER_BOTH,
-        resizeTo: document.getElementById('phaser-example')
-    },
-    scene: [
-        Preloader,
-        Play
-    ]
-};
-
-new Phaser.Game(config);
-
-    </script>
+        </script>
 
 
 </body></html>
