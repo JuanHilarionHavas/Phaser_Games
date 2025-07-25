@@ -4,13 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Kickups Phaser</title>
-  <link rel="stylesheet" href="css/reset.css" />
-  <link rel="stylesheet" href="css/main.css" />
-  <link rel="stylesheet" href="css/orientation_utils.css" />
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
   <script src="./main.js"></script>
 </head>
 <body>
   <div id="game-container"></div>
+  <script>
+    // Phaser 3 game using Matter.js physics
+    const config = {
+        type: Phaser.AUTO,
+        width: 300,
+        height: 600,
+        backgroundColor: '#000000',
+        parent: 'game-container',
+        physics: {
+            default: 'matter',
+            matter: {
+                gravity: { y: 1 },
+                debug: true
+            }
+        }
+    };
+
+    new Phaser.Game(Object.assign(config, { scene: KickUpScene }));
+  </script>
 </body>
 </html>

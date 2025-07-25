@@ -486,6 +486,10 @@
     @keyframes gwd-gen-goodgwdanimation_gwd-keyframes {
       0% {
         transform: translate3d(-3px, 6px, 0px) rotateZ(-3.16016deg);
+        animation-timing-function: linear;
+      }
+      16.6667% {
+        transform: translate3d(-3px, 6px, 0px) rotateZ(-3.16016deg);
         top: 168px;
         animation-timing-function: ease-in-out;
       }
@@ -496,7 +500,7 @@
       }
     }
     #End_Page.gwd-play-animation .gwd-gen-goodgwdanimation {
-      animation: 1s linear 3.4s 1 normal forwards running gwd-gen-goodgwdanimation_gwd-keyframes;
+      animation: 1.2s linear 3.2s 1 normal forwards running gwd-gen-goodgwdanimation_gwd-keyframes;
     }
     .gwd-image-1eph {
       position: absolute;
@@ -655,6 +659,7 @@
       transform-origin: 50% 50% 0px;
       top: 168px;
       transform: translate3d(-3px, 6px, 0px) rotateZ(-3.16016deg);
+      visibility: visible;
     }
     .gwd-p-1sef {
       height: 19.7969px;
@@ -1243,7 +1248,7 @@
           heartY: 100, // Posición vertical de los corazones
           // Callback a ejecutar al terminar el juego (definir en main.js)
           endGameCallback: function() {
-           gwd.actions.gwdPagedeck.goToPage('pagedeck', 'End_Page', 'fade', 1000, 'ease-in-out', 'bottom');
+            gwd.actions.gwdPagedeck.goToPage('pagedeck', 'End_Page', 'fade', 1000, 'ease-in-out', 'bottom');
           },
           // Padding alrededor del grid de cartas
           paddingTop: 25, // Padding superior del grid de cartas
