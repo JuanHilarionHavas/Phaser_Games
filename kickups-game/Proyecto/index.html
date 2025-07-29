@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Kickups Phaser</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script>
+  window.GAME_CONFIG = {
+    assetsBase: "assets/images/", // Ruta base para todos los assets de imágenes
+    publi: {  // Configuración del carrusel de imágenes publicitarias
+      // Lista de imágenes a mostrar en el carrusel
+      images: [
+        { name: "publi-0.jpg" }, // Imagen 1
+        { name: "publi-1.jpg" }, // Imagen 2
+        { name: "publi-2.jpg" }, // Imagen 3
+        { name: "publi-3.jpg" }  // Imagen 4
+      ],
+      cantidad: 4,  // Cantidad de imágenes en el carrusel
+      position: { x: 161, y: 205 }, // Posición central del carrusel dentro del canvas     
+      size: { width: 300, height: 168, scale: 0.3 },  // Tamaño y escala de las imágenes del carrusel
+      carousel: {      // Configuración de animación del carrusel
+        fadeDuration: 700, // Duración del fade entre imágenes (ms)
+        interval: 3000 // Intervalo entre cambios de imagen (ms)
+      }
+    },
+    led_banner: [ // Configuración de las franjas LED animadas (array de banners)
+      {
+        image: "led_banner.png", // Imagen del banner superior
+        position: { x: 150, y: 295 }, // Posición del banner superior
+        size: { width: 600, height: 12, scale: 0.5 }, // Tamaño y escala
+        marqueeSpeed: 30, // Velocidad de marquee (positivo: derecha)
+        direction: 1 // Dirección: 1 = izquierda
+      },
+      {
+        image: "led_banner.png", // Imagen del banner inferior (diferente para ejemplo)
+        position: { x: 150, y: 357 }, // Posición del banner inferior
+        size: { width: 600, height: 12, scale: 0.5 }, // Tamaño y escala
+        marqueeSpeed: 60, // Velocidad de marquee (positivo, pero con dirección -1)
+        direction: -1 // Dirección: -1 = derecha
+      }
+    ],
+    timer: {     // Configuración del temporizador principal del juego
+      timeLeft: 60, // Tiempo inicial del timer en segundos
+      delay: 1000,  // Intervalo entre actualizaciones del timer en ms
+      format: 'Tiempo: {t}'  // Formato de texto para mostrar el timer
+    },
+    audio: {    // Configuración de los íconos y archivos de sonido
+      volumeIcon: "volume-icon.png",       // Ícono para volumen activado
+      volumeIconOff: "volume-icon_off.png",    // Ícono para volumen desactivado
+      tap: {       // Sonido al hacer kick
+        src: "../assets/sounds/tap.mp3",   // Ruta del archivo de sonido
+        volume: 0.3      // Volumen de reproducción
+      },
+      reset_kickup: {      // Sonido al resetear el kickup (cuando el balón toca el piso)
+        src: "../assets/sounds/reset_kickup.mp3", // Ruta del archivo de sonido
+        volume: 0.3 // Volumen de reproducción
+      }
+    },    
+    ball: {     // Configuración del balón y su sombra
+      image: "ball_1.png",  // Imagen del balón
+      position: { x: 150, y: 500 },       // Posición inicial del balón
+      width: 150,   // Ancho real del asset del balón (px)
+      height: 150,  // Alto real del asset del balón (px)
+      scale: 0.5,   // Escala única del balón
+      minY: 100,    // Altura mínima para el cálculo de la sombra
+      maxY: 580,    // Altura máxima para el cálculo de la sombra
+      shadow: {  // Configuración de la sombra
+        image: "shadow.png",         // Imagen de la sombra
+        x: 150,         // Posición x de la sombra
+        y: 580,       // Posición y de la sombra
+        scale: 0.6   // Escala de la sombra
+      }
+    },
+    messages: [     // Mensajes de feedback que aparecen al hacer kick
+      "¡Buen toque!",
+      "¡Sigue así!",
+      "¡Crack!",
+      "¡Increíble!",
+      "¡Genial!"
+    ],
+    messageText: {     // Configuración de posición y estilos del texto animado de feedback
+      x: 350,       // Posición X del texto
+      y: 480,       // Posición Y del texto
+      font: "20px Arial",       // Fuente del texto
+      fill: "#ffff00",      // Color del texto
+      fontWeight: "bold",      // Grosor de la fuente
+      align: "center"      // Alineación del texto
+    },
+    floor: {    // Configuración del suelo físico del juego
+      y: 595,      // Posición Y del suelo
+      height: 10,      // Altura del suelo
+      friction: 0,       // Fricción del suelo
+      restitution: 1     // Restitución (rebote) del suelo
+    },
+    background: {    // Configuración del fondo del juego
+      image: "bg_game.jpg",      // Imagen de fondo
+      size: { width: 300, height: 600 }      // Tamaño del canvas de juego
+    },
+    audio: {
+      volumeIcon: "volume-icon.png", //Imagen icono de volumen
+      volumeIconOff: "volume-icon_off.png" //Imagen icono sin volumen
+    },
+    physics: {    // Parámetros físicos globales del juego (homogéneos para 300x600px y 60 FPS, step fijo)
+      gravityY: 0.6,        // Gravedad vertical ajustada para step fijo
+      restitution: 0.92,     // Rebote global del balón
+      wallBounce: 0.66,      // Rebote lateral
+      friction: 0.01,        // Fricción general
+      stopVelocity: 0.15,    // Umbral anti-microrebote
+      stopAngularVelocity: 0.15, // Umbral para detener giro
+      kick: {
+        forceY: -0.15,       // Fuerza vertical del kick ajustada
+        maxForceX: 0.12,     // Máxima fuerza horizontal
+        forceXFactor: 0.0038 // Factor de fuerza lateral
+      }
+    },
+    ui: {    // Selectores CSS para los elementos de UI en el DOM
+      timerSelector: "#timer-display",      // Selector del display de timer
+      scoreSelector: "#score-value",      // Selector del score
+      highscoreSelector: "#highscore-value",      // Selector del highscore
+      volumeBtnSelector: "#volume-btn",      // Selector del botón de volumen
+      volumeIconSelector: "#volume-icon"      // Selector del ícono de volumen
+    },
+    onGameEnd: function(finalScore, highScore) {    // Callback que se ejecuta al finalizar el juego (fin del timer)
+      if (this.ball && this.ball.disableInteractive) this.ball.disableInteractive();      // Desactiva el balón
+      if (this.timerEvent && this.timerEvent.remove) this.timerEvent.remove();           // Deteien el timer
+      // Muestra mensaje en el DOM
+      const timerDisplay = document.querySelector(window.GAME_CONFIG.ui.timerSelector);
+      if (timerDisplay) timerDisplay.textContent = '¡Tiempo terminado!';
+      // Loguea el score
+      console.log("Juego terminado:", finalScore, highScore);
+    }
+  };
+
+  </script>
+  <script src="./main.js"></script>
+</head>
+<body>
+  <div id="ui-bar">
+    <div id="ui-row1-timer" class="ui-cell"> <div id="timer-display">Tiempo: 60</div> </div>
+    <div id="ui-row1-volume" class="ui-cell"> <button id="volume-btn" aria-label="Toggle volume">
+      <img id="volume-icon" src="assets/images/volume-icon.png" alt="Volumen" style="width:32px;height:32px;vertical-align:middle;">
+    </button></div>
+    <div id="ui-row2-score" class="ui-cell"> <div id="score-area">
+      <div>
+        <span id="score-label">Score: </span><span id="score-value">0</span>
+      </div>
+      <div>
+        <span id="highscore-label">High Score: </span><span id="highscore-value">0</span>
+      </div>  
+    </div></div>
+  </div>
+  <div id="game-container"></div>
+  <!-- Fuerza tamaño fijo del canvas Phaser para evitar variaciones de gravedad visual -->
+  <style>
+    body {
+      display: flex;
+    }
+    #game-container canvas {
+      width: 300px !important;
+      height: 600px !important;
+      max-width: 300px;
+      max-height: 600px;
+      min-width: 300px;
+      min-height: 600px;
+      box-sizing: content-box;
+      image-rendering: pixelated;
+      display: block;
+      margin: 0 auto;
+    }
+    #ui-bar {
+      width: 300px;
+      margin: 0 auto 8px auto;
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      grid-template-columns: 70% 30%;
+      grid-template-areas:
+        "timer volume"
+        "score score";
+      font-family: Arial, sans-serif;
+      font-size: 18px;
+      color: #ffd700;
+      background: #181818;
+      border-radius: 10px;
+      padding: 4px 10px;
+      box-sizing: border-box;
+      position: absolute;
+      z-index: 10;
+    }
+
+    #ui-row1-timer { grid-area: timer; display: flex; align-items: center; }
+    #ui-row1-volume { grid-area: volume; display: flex; justify-content: flex-end; align-items: center; }
+    #ui-row2-score { grid-area: score; display: flex; align-items: center; }
+    #score-area { width: 100%; }
+
+    #score-area {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #volume-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      outline: none;
+      padding: 0;
+    }
+    #volume-icon {
+      transition: filter 0.2s;
+      filter: drop-shadow(0 0 2px #000);
+    }
+  </style>
+  <script>
+    // Phaser 3 game using Matter.js physics
+    const CFG = window.GAME_CONFIG;
+    const config = {
+        type: Phaser.AUTO,
+        width: 300,
+        height: 600,
+        fps: { target: 60, forceSetTimeOut: true },
+        backgroundColor: '#000000',
+        parent: 'game-container',
+        physics: {
+            default: 'matter',
+            matter: {
+                gravity: { y: CFG.physics.gravityY },
+                restitution: CFG.physics.restitution,
+                friction: CFG.physics.friction,
+                debug: false,
+                // Fuerza simulación física a 60 FPS para máxima igualdad entre dispositivos
+                timing: {
+                    timeScale: 1,
+                    fixedStep: true, // Paso de física siempre fijo
+                    delta: 1000 / 60 // 60 FPS exactos
+                },
+                getDelta: function (time, delta) {
+                    return this.scene.game.loop.delta;
+                },
+                runner: {
+                    isFixed: true,
+                    fps: 60
+                }
+            }
+        }
+    };
+
+    new Phaser.Game(Object.assign(config, { scene: KickUpScene }));
+  </script>
+</body>
+</html>
