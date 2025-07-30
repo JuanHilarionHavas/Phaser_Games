@@ -29,57 +29,61 @@ class KickUpScene extends Phaser.Scene {
 
         // --- Carrusel de imágenes publi ---
         this.publiImages = [];
-        CFG.publi.images.forEach((img, i) => {
-            let pub = this.add.image(CFG.publi.position.x, CFG.publi.position.y, 'publi-' + i).setAlpha(i === 0 ? 1 : 0);
-            pub.setDisplaySize(CFG.publi.size.width, CFG.publi.size.height);
-            pub.setOrigin(0.5, 0.5);
-            pub.setScale(CFG.publi.size.scale);
-            pub.setDepth(0.5);
-            this.publiImages.push(pub);
-        });
-        this.currentPubli = 0;
-        this.time.addEvent({
-            delay: CFG.publi.carousel.interval,
-            loop: true,
-            callback: () => {
-                let prev = this.currentPubli;
-                let next = (this.currentPubli + 1) % this.publiImages.length;
-                this.tweens.add({
-                    targets: this.publiImages[prev],
-                    alpha: 0,
-                    duration: CFG.publi.carousel.fadeDuration,
-                    onComplete: () => {
-                        this.publiImages[prev].setAlpha(0);
-                    }
-                });
-                this.tweens.add({
-                    targets: this.publiImages[next],
-                    alpha: 1,
-                    duration: CFG.publi.carousel.fadeDuration,
-                    onStart: () => {
-                        this.publiImages[next].setAlpha(0);
-                    }
-                });
-                this.currentPubli = next;
-            }
-        });
+        if (CFG.publi.active !== false) {
+            CFG.publi.images.forEach((img, i) => {
+                let pub = this.add.image(CFG.publi.position.x, CFG.publi.position.y, 'publi-' + i).setAlpha(i === 0 ? 1 : 0);
+                pub.setDisplaySize(CFG.publi.size.width, CFG.publi.size.height);
+                pub.setOrigin(0.5, 0.5);
+                pub.setScale(CFG.publi.size.scale);
+                pub.setDepth(0.5);
+                this.publiImages.push(pub);
+            });
+            this.currentPubli = 0;
+            this.time.addEvent({
+                delay: CFG.publi.carousel.interval,
+                loop: true,
+                callback: () => {
+                    let prev = this.currentPubli;
+                    let next = (this.currentPubli + 1) % this.publiImages.length;
+                    this.tweens.add({
+                        targets: this.publiImages[prev],
+                        alpha: 0,
+                        duration: CFG.publi.carousel.fadeDuration,
+                        onComplete: () => {
+                            this.publiImages[prev].setAlpha(0);
+                        }
+                    });
+                    this.tweens.add({
+                        targets: this.publiImages[next],
+                        alpha: 1,
+                        duration: CFG.publi.carousel.fadeDuration,
+                        onStart: () => {
+                            this.publiImages[next].setAlpha(0);
+                        }
+                    });
+                    this.currentPubli = next;
+                }
+            });
+        }
 
         // --- Franjas led tipo marquee (soporte para múltiples banners) ---
         this.ledBanners = [];
         CFG.led_banner.forEach((bannerCfg, i) => {
-            const key = 'led_banner_' + i;
-            this.load.image(key, CFG.assetsBase + bannerCfg.image); // Preload dinámico si fuera necesario
-            const led = this.add.tileSprite(
-                bannerCfg.position.x,
-                bannerCfg.position.y,
-                bannerCfg.size.width,
-                bannerCfg.size.height,
-                key
-            ).setDepth(2);
-            led.setScale(bannerCfg.size.scale);
-            // Si marqueeSpeed es negativo, la dirección es inversa; si no, usar direction explícito si lo hay
-            const direction = (typeof bannerCfg.direction === 'number') ? bannerCfg.direction : (bannerCfg.marqueeSpeed >= 0 ? 1 : -1);
-            this.ledBanners.push({ sprite: led, marqueeSpeed: Math.abs(bannerCfg.marqueeSpeed), direction });
+            if (bannerCfg.active !== false) {
+                const key = 'led_banner_' + i;
+                this.load.image(key, CFG.assetsBase + bannerCfg.image); // Preload dinámico si fuera necesario
+                const led = this.add.tileSprite(
+                    bannerCfg.position.x,
+                    bannerCfg.position.y,
+                    bannerCfg.size.width,
+                    bannerCfg.size.height,
+                    key
+                ).setDepth(2);
+                led.setScale(bannerCfg.size.scale);
+                // Si marqueeSpeed es negativo, la dirección es inversa; si no, usar direction explícito si lo hay
+                const direction = (typeof bannerCfg.direction === 'number') ? bannerCfg.direction : (bannerCfg.marqueeSpeed >= 0 ? 1 : -1);
+                this.ledBanners.push({ sprite: led, marqueeSpeed: Math.abs(bannerCfg.marqueeSpeed), direction });
+            }
         });
 
         // Audio (solo lógica, UI en DOM)
