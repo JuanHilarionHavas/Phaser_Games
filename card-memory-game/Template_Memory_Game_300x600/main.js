@@ -243,9 +243,10 @@ class Play extends Phaser.Scene {
     const spacing = ui.heartSpacing || 35;
     const scale = ui.heartScale || 2;
     const y = ui.heartY || 65;
+    const x = ui.heartX || 65;
     const totalWidth = (heartCount - 1) * spacing;
     const centerX = this.sys.game.scale.width / 2;
-    const startX = centerX - totalWidth / 2;
+    const startX = ui.heartX;
     return Array.from({ length: heartCount }).map((_, i) => {
       const x = startX + i * spacing;
       const h = this.add.image(x, y, 'heart').setScale(scale);
@@ -262,10 +263,8 @@ class Play extends Phaser.Scene {
     this.canMove = false;
     if (this.timerEvent) this.timerEvent.paused = true;
     this.sound.setVolume(0);
-    // Si hay callback definido en config, ejecutarlo y salir
-    if (this.config.ui && typeof this.config.ui.endGameCallback === 'function') {
-      this.config.ui.endGameCallback();
-      return;
+    if (typeof this.config.onGameEnd === 'function') {
+       this.config.onGameEnd.call(this, this.lives, this.timeLeft);
     }
   }  
 
@@ -273,18 +272,6 @@ class Play extends Phaser.Scene {
     const ui = this.config.ui;
     this.timeLeft = this.config.timeLimit;
     this.hearts = this.createHearts();
-
-    // Reproducir el tema principal si no está sonando
-    const themeCfg = this.config.assets.sounds.theme;
-    if (themeCfg) {
-      if (!this.themeMusic || !this.themeMusic.isPlaying) {
-        this.themeMusic = this.sound.add(themeCfg.key, {
-          transparent: true,
-          volume: themeCfg.volume !== undefined ? themeCfg.volume : 0.5
-        });
-        this.themeMusic.play();
-      }
-    }
 
       // Usar elemento DOM externo
       this.timerElement = document.querySelector(ui.timerSelector);
