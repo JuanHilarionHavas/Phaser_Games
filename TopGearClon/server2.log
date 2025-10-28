@@ -1,0 +1,6 @@
+::1 - - [22/Oct/2025 15:22:56] "GET /index.html HTTP/1.1" 200 -
+::1 - - [22/Oct/2025 15:22:56] "GET /main.js HTTP/1.1" 200 -
+::1 - - [22/Oct/2025 15:22:56] "GET /assets/images/background.png HTTP/1.1" 200 -
+::1 - - [22/Oct/2025 15:22:56] "GET /assets/images/sprites.png HTTP/1.1" 200 -
+::1 - - [22/Oct/2025 15:22:56] code 404, message File not found
+::1 - - [22/Oct/2025 15:22:56] "GET /favicon.ico HTTP/1.1" 404 -

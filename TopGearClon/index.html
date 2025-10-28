@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Top Gear Clone - Phaser 3</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        #hud-overlay {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            padding: 0 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .hud-item {
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px #000, -1px -1px 2px #000;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        #speed-display { color: #00ff00; }
+        #lap-time-display { color: #ffff00; }
+        #phaser-game {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="hud-overlay">
+            <div id="speed-display" class="hud-item">Speed: 0</div>
+            <div id="lap-time-display" class="hud-item">Time: 0.0</div>
+            <div id="position-display" class="hud-item">Pos: 1/5</div>
+        </div>
+        <div id="phaser-game"></div>
+    </div>
+
+    <script>
+        // Configuración global del juego Top Gear Clone
+        window.GAME_CONFIG = {
+            // Dimensiones del canvas
+            canvas: {
+                width: 300,
+                height: 600,
+                // Dimensión alternativa para 320x480
+                altWidth: 320,
+                altHeight: 480,
+                useAlt: false // Cambiar a true para usar 320x480
+            },
+
+            // Configuración de física del vehículo
+            player: {
+                maxSpeed: 200,           // Velocidad máxima (segmentLength/step)
+                acceleration: 40,        // Aceleración (maxSpeed/5)
+                braking: -200,           // Frenado (-maxSpeed)
+                deceleration: -40,       // Desaceleración natural (-maxSpeed/5)
+                offRoadDecel: -100,      // Desaceleración fuera de la carretera
+                offRoadLimit: 50,        // Velocidad mínima fuera de carretera
+                centrifugal: 0.3,        // Fuerza centrífuga en curvas
+                startZ: 0,               // Posición inicial Z del jugador
+                carSprite: 'player'      // Key del sprite del auto del jugador
+            },
+
+            // Configuración de Matter.js Physics
+            physics: {
+                friction: 0.95,          // Fricción del vehículo (0-1)
+                frictionAir: 0.02,       // Resistencia del aire
+                mass: 1,                 // Masa del vehículo
+                inertia: Infinity,       // Inercia infinita para evitar rotación
+                restitution: 0.1,        // Rebote en colisiones
+                collisionFilter: {
+                    category: 0x0001,    // Categoría del jugador
+                    mask: 0x0002         // Colisiona con tráfico
+                }
+            },
+
+            // Configuración de la carretera
+            road: {
+                width: 2000,             // Mitad del ancho de carretera (va de -width a +width)
+                segmentLength: 200,      // Longitud de cada segmento
+                rumbleLength: 3,         // Segmentos por franja roja/blanca
+                lanes: 3,                // Número de carriles
+
+                // Configuración de curvas y colinas
+                curve: {
+                    none: 0,
+                    easy: 2,
+                    medium: 4,
+                    hard: 6
+                },
+                hill: {
+                    none: 0,
+                    low: 20,
+                    medium: 40,
+                    high: 60
+                },
+                length: {
+                    none: 0,
+                    short: 25,
+                    medium: 50,
+                    long: 100
+                }
+            },
+
+            // Configuración de cámara
+            camera: {
+                height: 1000,            // Altura de la cámara
+                fieldOfView: 100,        // Campo de visión en grados
+                drawDistance: 300,       // Número de segmentos a dibujar
+                fogDensity: 5            // Densidad de niebla exponencial
+            },
+
+            // Configuración de parallax backgrounds
+            parallax: {
+                skySpeed: 0.001,         // Velocidad de scroll del cielo
+                hillSpeed: 0.002,        // Velocidad de scroll de colinas
+                treeSpeed: 0.003         // Velocidad de scroll de árboles
+            },
+
+            // Configuración de tráfico
+            traffic: {
+                totalCars: 50,           // Número total de autos en la pista (reducido para rich media)
+                minSpeed: 50,            // Velocidad mínima de autos
+                maxSpeed: 150,           // Velocidad máxima de autos
+                lookahead: 20,           // Segmentos que miran adelante para esquivar
+                avoidanceSpeed: 0.1      // Velocidad de reacción para esquivar
+            },
+
+            // Configuración de sprites y decoración
+            sprites: {
+                scale: 0.3,              // Escala base de sprites
+                plants: [                // Plantas a colocar en los bordes
+                    'PALM_TREE', 'TREE1', 'TREE2', 'BUSH1', 'BUSH2', 'CACTUS'
+                ],
+                billboards: [            // Vallas publicitarias
+                    'BILLBOARD01', 'BILLBOARD02', 'BILLBOARD03', 'BILLBOARD04',
+                    'BILLBOARD05', 'BILLBOARD06', 'BILLBOARD07', 'BILLBOARD08', 'BILLBOARD09'
+                ],
+                cars: [                  // Sprites de autos de tráfico
+                    'CAR01', 'CAR02', 'CAR03', 'CAR04', 'SEMI', 'TRUCK'
+                ]
+            },
+
+            // Configuración de colores
+            colors: {
+                sky: '#72D7EE',
+                fog: '#005108',
+                light: {
+                    road: '#6B6B6B',
+                    grass: '#10AA10',
+                    rumble: '#555555',
+                    lane: '#CCCCCC'
+                },
+                dark: {
+                    road: '#696969',
+                    grass: '#009A00',
+                    rumble: '#BBBBBB',
+                    lane: null
+                },
+                start: {
+                    road: '#FFFFFF',
+                    grass: '#FFFFFF',
+                    rumble: '#FFFFFF',
+                    lane: null
+                },
+                finish: {
+                    road: '#000000',
+                    grass: '#000000',
+                    rumble: '#000000',
+                    lane: null
+                }
+            },
+
+            // Configuración del HUD
+            hud: {
+                speedSelector: '#speed-display',
+                lapTimeSelector: '#lap-time-display',
+                positionSelector: '#position-display',
+                speedLabel: 'Speed',
+                lapTimeLabel: 'Time',
+                positionLabel: 'Pos',
+                updateFrequency: 100     // Actualización cada 100ms
+            },
+
+            // Configuración de assets
+            assets: {
+                basePath: 'assets/',
+                images: {
+                    background: {
+                        key: 'background',
+                        path: 'images/background.png'
+                    },
+                    sprites: {
+                        key: 'sprites',
+                        path: 'images/sprites.png'
+                    }
+                },
+                // Audio deshabilitado - agregar archivos en assets/audio/ para habilitar
+                audio: null,
+
+                // Coordenadas de sprites en el spritesheet (background.png)
+                spriteCoords: {
+                    // Fondos parallax
+                    SKY: { x: 5, y: 495, w: 1280, h: 480 },
+                    HILLS: { x: 5, y: 5, w: 1280, h: 480 },
+                    TREES: { x: 5, y: 985, w: 1280, h: 480 },
+
+                    // Decoración (sprites.png)
+                    PALM_TREE: { x: 5, y: 5, w: 215, h: 540 },
+                    BILLBOARD08: { x: 230, y: 5, w: 385, h: 265 },
+                    TREE1: { x: 625, y: 5, w: 360, h: 360 },
+                    DEAD_TREE1: { x: 5, y: 555, w: 135, h: 332 },
+                    BILLBOARD09: { x: 150, y: 555, w: 328, h: 282 },
+                    BOULDER3: { x: 230, y: 280, w: 320, h: 220 },
+                    COLUMN: { x: 995, y: 5, w: 200, h: 315 },
+                    BILLBOARD01: { x: 625, y: 375, w: 300, h: 170 },
+                    BILLBOARD06: { x: 488, y: 555, w: 298, h: 190 },
+                    BILLBOARD05: { x: 5, y: 897, w: 298, h: 190 },
+                    BILLBOARD07: { x: 313, y: 897, w: 298, h: 190 },
+                    BOULDER2: { x: 621, y: 897, w: 298, h: 140 },
+                    TREE2: { x: 1205, y: 5, w: 282, h: 295 },
+                    BILLBOARD04: { x: 1205, y: 310, w: 268, h: 170 },
+                    DEAD_TREE2: { x: 1205, y: 490, w: 150, h: 260 },
+                    BOULDER1: { x: 1205, y: 760, w: 168, h: 248 },
+                    BUSH1: { x: 5, y: 1097, w: 240, h: 155 },
+                    CACTUS: { x: 929, y: 897, w: 235, h: 118 },
+                    BUSH2: { x: 255, y: 1097, w: 232, h: 152 },
+                    BILLBOARD03: { x: 5, y: 1262, w: 230, h: 220 },
+                    BILLBOARD02: { x: 245, y: 1262, w: 215, h: 220 },
+                    STUMP: { x: 995, y: 330, w: 195, h: 140 },
+
+                    // Vehículos de tráfico
+                    SEMI: { x: 1365, y: 490, w: 122, h: 144 },
+                    TRUCK: { x: 1365, y: 644, w: 100, h: 78 },
+                    CAR03: { x: 1383, y: 760, w: 88, h: 55 },
+                    CAR02: { x: 1383, y: 825, w: 80, h: 59 },
+                    CAR04: { x: 1383, y: 894, w: 80, h: 57 },
+                    CAR01: { x: 1205, y: 1018, w: 80, h: 56 },
+
+                    // Jugador
+                    PLAYER_UPHILL_LEFT: { x: 1383, y: 961, w: 80, h: 45 },
+                    PLAYER_UPHILL_STRAIGHT: { x: 1295, y: 1018, w: 80, h: 45 },
+                    PLAYER_UPHILL_RIGHT: { x: 1385, y: 1018, w: 80, h: 45 },
+                    PLAYER_LEFT: { x: 995, y: 480, w: 80, h: 41 },
+                    PLAYER_STRAIGHT: { x: 1085, y: 480, w: 80, h: 41 },
+                    PLAYER_RIGHT: { x: 995, y: 531, w: 80, h: 41 }
+                }
+            },
+
+            // Configuración de controles
+            controls: {
+                left: ['ArrowLeft', 'KeyA'],
+                right: ['ArrowRight', 'KeyD'],
+                faster: ['ArrowUp', 'KeyW'],
+                slower: ['ArrowDown', 'KeyS']
+            },
+
+            // Configuración del juego
+            game: {
+                fps: 60,                 // Frames por segundo
+                lapCount: 3,             // Número de vueltas
+                totalRacers: 5           // Total de corredores (incluyendo jugador)
+            }
+        };
+    </script>
+
+    <!-- Phaser 3 desde CDN para rich media -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+
+    <!-- Script principal del juego -->
+    <script src="main.js"></script>
+
+    <script>
+        // Inicializar Phaser con la configuración
+        const cfg = window.GAME_CONFIG;
+        const canvasCfg = cfg.canvas;
+
+        const phaserConfig = {
+            type: Phaser.AUTO,
+            width: canvasCfg.useAlt ? canvasCfg.altWidth : canvasCfg.width,
+            height: canvasCfg.useAlt ? canvasCfg.altHeight : canvasCfg.height,
+            parent: 'phaser-game',
+            backgroundColor: cfg.colors.sky,
+            physics: {
+                default: 'matter',
+                matter: {
+                    gravity: { y: 0 }, // Sin gravedad para juego de carreras top-down
+                    debug: false,
+                    enableSleeping: false
+                }
+            },
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            scene: [Preloader, MainGame]
+        };
+
+        window.game = new Phaser.Game(phaserConfig);
+    </script>
+</body>
+</html>
