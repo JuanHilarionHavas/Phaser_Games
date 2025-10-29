@@ -14,9 +14,13 @@ class Preloader extends Phaser.Scene {
     this.load.setBaseURL('./');
     this.load.setPath(assets.basePath || './');
 
-    // Cargar background
-    if (assets.background) {
-      this.load.image(assets.background.key, assets.background.path);
+    // Cargar backgrounds (parallax con dos capas)
+    const bgConfig = gameConfig.background;
+    if (bgConfig.landscape) {
+      this.load.image(bgConfig.landscape.key, bgConfig.landscape.path);
+    }
+    if (bgConfig.track) {
+      this.load.image(bgConfig.track.key, bgConfig.track.path);
     }
 
     // Cargar línea de salida
@@ -37,12 +41,37 @@ class Preloader extends Phaser.Scene {
       });
     }
 
-    // Cargar obstáculo sprite sheet
-    if (assets.obstacle) {
-      this.load.spritesheet(assets.obstacle.key, assets.obstacle.path, {
-        frameWidth: gameConfig.obstacles.frameWidth || 128.14,
-        frameHeight: gameConfig.obstacles.frameHeight || 199
-      });
+    // Cargar obstáculos dinámicamente desde config
+    const obstaclesConfig = gameConfig.obstacles;
+
+    // Cargar obstáculo 1 (solo si está activo)
+    if (obstaclesConfig.obstacle1 && obstaclesConfig.obstacle1.active) {
+      const obs1 = obstaclesConfig.obstacle1;
+      if (obs1.isAnimated) {
+        // Cargar como sprite sheet
+        this.load.spritesheet(obs1.key, assets.basePath + obs1.path, {
+          frameWidth: obs1.frameWidth,
+          frameHeight: obs1.frameHeight
+        });
+      } else {
+        // Cargar como imagen estática
+        this.load.image(obs1.key, assets.basePath + obs1.path);
+      }
+    }
+
+    // Cargar obstáculo 2 (solo si está activo)
+    if (obstaclesConfig.obstacle2 && obstaclesConfig.obstacle2.active) {
+      const obs2 = obstaclesConfig.obstacle2;
+      if (obs2.isAnimated) {
+        // Cargar como sprite sheet
+        this.load.spritesheet(obs2.key, assets.basePath + obs2.path, {
+          frameWidth: obs2.frameWidth,
+          frameHeight: obs2.frameHeight
+        });
+      } else {
+        // Cargar como imagen estática
+        this.load.image(obs2.key, assets.basePath + obs2.path);
+      }
     }
   }
 
@@ -58,16 +87,36 @@ class Preloader extends Phaser.Scene {
       repeat: -1 // Loop infinito
     });
 
-    // Crear animación del obstáculo (configurable desde config)
-    this.anims.create({
-      key: gameConfig.obstacles.animationKey || 'obstacle-run',
-      frames: this.anims.generateFrameNumbers(gameConfig.assets.obstacle.key, {
-        start: gameConfig.obstacles.animationStart || 0,
-        end: (gameConfig.obstacles.frames || 7) - 1
-      }),
-      frameRate: gameConfig.obstacles.animationFrameRate || 10,
-      repeat: -1 // Loop infinito
-    });
+    // Crear animaciones de obstáculos (solo si están activos y son animados)
+    const obstaclesConfig = gameConfig.obstacles;
+
+    // Animación obstáculo 1
+    if (obstaclesConfig.obstacle1 && obstaclesConfig.obstacle1.active && obstaclesConfig.obstacle1.isAnimated) {
+      const obs1 = obstaclesConfig.obstacle1;
+      this.anims.create({
+        key: obs1.animationKey,
+        frames: this.anims.generateFrameNumbers(obs1.key, {
+          start: obs1.animationStart || 0,
+          end: obs1.frames - 1
+        }),
+        frameRate: obs1.animationFrameRate || 10,
+        repeat: -1
+      });
+    }
+
+    // Animación obstáculo 2
+    if (obstaclesConfig.obstacle2 && obstaclesConfig.obstacle2.active && obstaclesConfig.obstacle2.isAnimated) {
+      const obs2 = obstaclesConfig.obstacle2;
+      this.anims.create({
+        key: obs2.animationKey,
+        frames: this.anims.generateFrameNumbers(obs2.key, {
+          start: obs2.animationStart || 0,
+          end: obs2.frames - 1
+        }),
+        frameRate: obs2.animationFrameRate || 10,
+        repeat: -1
+      });
+    }
 
     this.scene.start('Play');
   }
@@ -87,13 +136,23 @@ class Play extends Phaser.Scene {
     this.timeLeft = this.config.timeLimit;
     this.score = this.config.initialScore;
     this.obstacles = [];
-    this.bgScrollX = 0;
+    this.bgLandscapeScrollX = 0; // Scroll del landscape (más lento)
+    this.bgTrackScrollX = 0;     // Scroll del track (más rápido)
     this.backgroundPaused = false; // Flag para pausar el scroll del background
     this.timerReachedZero = false; // Flag para saber si el timer ya llegó a 0
     this.isGameOver = false;
     this.hasReachedGoal = false;
     this.isMovingToGoal = false; // Flag para indicar que se está moviendo a la meta
     this.finishLineShown = false; // Flag para controlar si ya se mostró la línea de meta
+
+    // Preparar lista de tipos de obstáculos disponibles (solo los activos)
+    this.obstacleTypes = [];
+    if (this.config.obstacles.obstacle1 && this.config.obstacles.obstacle1.active) {
+      this.obstacleTypes.push(this.config.obstacles.obstacle1);
+    }
+    if (this.config.obstacles.obstacle2 && this.config.obstacles.obstacle2.active) {
+      this.obstacleTypes.push(this.config.obstacles.obstacle2);
+    }
 
     // Actualizar UI inicial
     this.updateTimerDisplay();
@@ -122,29 +181,55 @@ class Play extends Phaser.Scene {
     }
   }
 
+  // Calcular depth basado en el carril (carril 0 = arriba = menos depth, carril 2 = abajo = más depth)
+  getDepthForLane(lane) {
+    // Base depth: 10
+    // Carril 0 (arriba): depth 8
+    // Carril 1 (medio): depth 10
+    // Carril 2 (abajo): depth 12
+    return 10 + (lane - 1) * 2;
+  }
+
   create() {
     const width = this.sys.game.scale.width;
     const height = this.sys.game.scale.height;
 
-    // Configuración del background
+    // Configuración del background con parallax (dos capas)
     const bgConfig = this.config.background;
-    const bgScale = bgConfig.scale || 1;
-    const bgTileWidth = bgConfig.displayWidth || (bgConfig.width * bgScale);
-    const bgTileHeight = bgConfig.displayHeight || (bgConfig.height * bgScale);
-    const bgOffsetX = bgConfig.offsetX || 0;
-    const bgOffsetY = bgConfig.offsetY || 0;
 
-    // Crear background principal para scroll
-    // El TileSprite cubre todo el canvas pero usa el tile del tamaño configurado
-    this.bg = this.add.tileSprite(
-      bgOffsetX,
-      (height / 2) + bgOffsetY,
-      width,  // Ancho del canvas para cubrir todo
-      height, // Alto del canvas para cubrir todo
-      'bg'
+    // Capa 1: Landscape (fondo - más lento)
+    const landscapeConfig = bgConfig.landscape;
+    const landscapeScale = landscapeConfig.scale || 1;
+    const landscapeOffsetX = landscapeConfig.offsetX || 0;
+    const landscapeOffsetY = landscapeConfig.offsetY || 0;
+
+    this.bgLandscape = this.add.tileSprite(
+      landscapeOffsetX,
+      (height / 2) + landscapeOffsetY,
+      width,
+      height,
+      landscapeConfig.key
     )
       .setOrigin(0, 0.5)
-      .setTileScale(bgScale, bgScale); // Aplicar escala a los tiles
+      .setTileScale(landscapeScale, landscapeScale)
+      .setDepth(0); // Fondo más atrás
+
+    // Capa 2: Track (pista - más rápido)
+    const trackConfig = bgConfig.track;
+    const trackScale = trackConfig.scale || 1;
+    const trackOffsetX = trackConfig.offsetX || 0;
+    const trackOffsetY = trackConfig.offsetY || 0;
+
+    this.bgTrack = this.add.tileSprite(
+      trackOffsetX,
+      (height / 2) + trackOffsetY,
+      width,
+      height,
+      trackConfig.key
+    )
+      .setOrigin(0, 0.5)
+      .setTileScale(trackScale, trackScale)
+      .setDepth(2); // Delante del landscape pero detrás de objetos
 
     // Calcular el centro vertical de la zona de carriles
     const lanePositions = this.config.lanes.positions;
@@ -164,7 +249,7 @@ class Play extends Phaser.Scene {
       .setAngle(startLineRotation)
       .setFlipX(startLineFlipX)
       .setFlipY(startLineFlipY)
-      .setDepth(1);
+      .setDepth(5); // Por encima del track (depth 2) pero debajo de jugadores (depth 8-12)
 
     // Crear línea de meta (invisible al inicio, se moverá desde la derecha)
     const finishLineConfig = this.config.finishLine || {};
@@ -180,7 +265,7 @@ class Play extends Phaser.Scene {
       .setAngle(finishLineRotation)
       .setFlipX(finishLineFlipX)
       .setFlipY(finishLineFlipY)
-      .setDepth(1)
+      .setDepth(5) // Por encima del track (depth 2) pero debajo de jugadores (depth 8-12)
       .setVisible(false);
 
     // Crear player
@@ -189,7 +274,7 @@ class Play extends Phaser.Scene {
     this.player = this.physics.add.sprite(playerX, playerY, gameConfig.assets.player.key)
       .setScale(gameConfig.player.scale)
       .setFrame(0) // Iniciar en frame 0 (quieto)
-      .setDepth(10); // Player siempre por encima de los obstáculos
+      .setDepth(this.getDepthForLane(this.currentLane)); // Depth dinámico según carril
 
     // NO iniciar la animación aún, esperar al conteo o inicio del juego
 
@@ -327,6 +412,9 @@ class Play extends Phaser.Scene {
     if (newLane !== this.currentLane) {
       this.currentLane = newLane;
       const targetY = this.config.lanes.positions[this.currentLane];
+
+      // Actualizar depth del player según el nuevo carril
+      this.player.setDepth(this.getDepthForLane(this.currentLane));
 
       // Animar movimiento del player
       this.tweens.add({
@@ -469,19 +557,31 @@ class Play extends Phaser.Scene {
 
   spawnObstacle() {
     if (this.isGameOver || this.isMovingToGoal) return; // No spawear si va a la meta
+    if (this.obstacleTypes.length === 0) return; // No hay obstáculos configurados
 
     const width = this.sys.game.scale.width;
-    const height = this.sys.game.scale.height;
 
     // Elegir carril aleatorio
     const lane = Phaser.Math.Between(0, this.config.lanes.count - 1);
     const y = this.config.lanes.positions[lane];
 
-    // Crear obstáculo con animación
-    const obstacle = this.obstaclesGroup.create(width + 50, y, gameConfig.assets.obstacle.key)
-      .setScale(this.config.obstacles.scale)
-      .setDepth(5) // Obstáculos debajo del player (depth < 10)
-      .play(this.config.obstacles.animationKey || 'obstacle-run'); // Reproducir animación
+    // Elegir tipo de obstáculo aleatorio de los disponibles
+    const obstacleType = Phaser.Utils.Array.GetRandom(this.obstacleTypes);
+
+    // Crear obstáculo según su tipo (animado o estático)
+    let obstacle;
+    if (obstacleType.isAnimated) {
+      // Crear obstáculo animado
+      obstacle = this.obstaclesGroup.create(width + 50, y, obstacleType.key)
+        .setScale(obstacleType.scale)
+        .setDepth(this.getDepthForLane(lane)) // Depth dinámico según carril
+        .play(obstacleType.animationKey);
+    } else {
+      // Crear obstáculo estático (imagen simple)
+      obstacle = this.obstaclesGroup.create(width + 50, y, obstacleType.key)
+        .setScale(obstacleType.scale)
+        .setDepth(this.getDepthForLane(lane)); // Depth dinámico según carril
+    }
 
     obstacle.lane = lane;
     obstacle.passed = false; // Para trackear si ya pasó el player
@@ -524,14 +624,24 @@ class Play extends Phaser.Scene {
   update() {
     if (this.isGameOver) return;
 
-    // Scroll del background (solo cuando el juego ha comenzado y NO está pausado)
+    // Scroll del background con parallax (solo cuando el juego ha comenzado y NO está pausado)
     if (this.gameStarted && !this.backgroundPaused) {
-      this.bgScrollX += this.config.background.scrollSpeed;
-      this.bg.tilePositionX = this.bgScrollX;
+      const bgConfig = this.config.background;
+
+      // Scroll landscape (más lento - efecto parallax de fondo)
+      this.bgLandscapeScrollX += bgConfig.landscape.scrollSpeed;
+      this.bgLandscape.tilePositionX = this.bgLandscapeScrollX;
+
+      // Scroll track (más rápido - primer plano)
+      this.bgTrackScrollX += bgConfig.track.scrollSpeed;
+      this.bgTrack.tilePositionX = this.bgTrackScrollX;
+
+      // Velocidad de referencia para líneas y obstáculos (usar velocidad del track)
+      const referenceSpeed = bgConfig.track.scrollSpeed;
 
       // Mover la línea de salida hacia la izquierda (sale de pantalla)
       if (this.startLine && this.startLine.active) {
-        this.startLine.x -= this.config.background.scrollSpeed;
+        this.startLine.x -= referenceSpeed;
         if (this.startLine.x < -100) {
           this.startLine.destroy();
         }
@@ -539,7 +649,7 @@ class Play extends Phaser.Scene {
 
       // Mover la línea de meta hacia la izquierda (igual que la línea de salida, pero NO se destruye)
       if (this.finishLine && this.finishLine.visible) {
-        this.finishLine.x -= this.config.background.scrollSpeed;
+        this.finishLine.x -= referenceSpeed;
       }
     }
 
