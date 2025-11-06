@@ -1,0 +1,290 @@
+<html lang="en"><head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Runner Game</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 20px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #timer-display, #score-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 4px #000;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+        }
+        #phaser-example {
+           height: 600px;
+           width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-overlay">
+            <div id="timer-display">Tiempo: 30</div>
+            <div id="score-display">Score: 0</div>
+        </div>
+        <div id="phaser-example"></div>
+    </div>
+    <script>
+      window.GAME_CONFIG = {
+        // Configuración del juego
+        timeLimit: 30, // Tiempo límite en segundos
+        initialScore: 100, // Score inicial
+        scoreIncrement: 10, // Puntos por evitar obstáculo
+        scoreDecrement: 20, // Puntos perdidos por colisión
+
+        // Modo de juego: 'lanes' (multicarril) o 'runner' (salto)
+        gameMode: 'lanes', // 'lanes' = 3 carriles con cambio arriba/abajo, 'runner' = 1 carril con salto
+
+        // Configuración del player
+        player: {
+          frameWidth: 204.6, // Ancho de cada frame del sprite sheet (2046/10)
+          frameHeight: 199, // Alto del sprite sheet
+          frames: 10, // Número de frames en el sprite sheet
+          scale: 0.5, // Escala del player
+          animationKey: 'run', // Key de la animación
+          frameRate: 16, // Velocidad de la animación del player (FPS) - mayor = más rápido, menor = más lento
+          startX: 60 // Posición X inicial (más atrás en anchos estrechos)
+        },
+
+        // Configuración de los carriles (solo para gameMode: 'lanes')
+        lanes: {
+          count: 3, // Número de carriles
+          positions: [370, 420, 480] // Posiciones Y en píxeles (para canvas 300x600)
+        },
+
+        // Configuración del salto (solo para gameMode: 'runner')
+        jump: {
+          enabled: true,           // true = permitir salto en modo runner
+          playerY: 400,            // Posición Y del player en modo runner (donde corre el player) - ajustar según canvas
+          jumpVelocity: -700,      // Velocidad inicial del salto (negativo = hacia arriba) - mayor = más alto
+          gravity: 1500,           // Gravedad que afecta al player - mayor = cae más rápido
+          jumpKey: 'SPACE',        // Tecla principal para saltar (SPACE, UP, W, etc.)
+          allowDoubleJump: false   // true = permitir doble salto, false = un solo salto
+        },
+
+        // Configuración del background con parallax (dos capas)
+        background: {
+          // Capa 1: Landscape (cielo y estadio) - Fondo
+          landscape: {
+            key: 'landscape',
+            path: 'landscape.png',
+            width: 777,            // Ancho original del asset
+            height: 300,            // Alto original del asset
+            scrollSpeed: 0.7,       // Velocidad más lenta (efecto parallax)
+            scale: 1,               // Escala del tile
+            offsetX: 0,             // Desplazamiento horizontal
+            offsetY: 0,             // Desplazamiento vertical
+            displayWidth: 777,     // Ancho para el TileSprite
+            displayHeight: 300      // Alto para el TileSprite
+          },
+
+          // Capa 2: Track (pista de fútbol) - Primer plano
+          track: {
+            key: 'track',
+            path: 'track.png',
+            width: 1092,            // Ancho original del asset
+            height: 300,            // Alto original del asset
+            scrollSpeed: 3.3,         // Velocidad más rápida (primer plano)
+            scale: 1,               // Escala del tile
+            offsetX: 0,             // Desplazamiento horizontal
+            offsetY: 300,           // Desplazamiento vertical para alinear con landscape
+            displayWidth: 1092,     // Ancho para el TileSprite
+            displayHeight: 300      // Alto para el TileSprite
+          }
+        },
+
+        // Configuración de obstáculos (se puede usar 1 o 2 tipos)
+        obstacles: {
+          minSpawnInterval: 1000, // Mínimo tiempo entre spawns (ms)
+          maxSpawnInterval: 2500, // Máximo tiempo entre spawns (ms)
+          speed: 3, // Velocidad base (se usa solo si obstacle no tiene speed propio)
+          // Obstáculo 1
+          obstacle1: {
+            active: true, // true = usar este obstáculo, false = no usar
+            key: 'obstacle1',
+            path: 'obstacle.png',
+            isAnimated: true, // true = sprite animado que corre en contra, false = estático que se mueve con background
+            scale: 0.4,
+            speed: 3, // Velocidad individual (animados corren en contra del player)
+            groundY: 400, // Posición Y en modo runner (donde aparece el obstáculo) - ajustar según canvas
+            spawnWeight: 3, // Peso de aparición (1 = normal, 2 = doble frecuencia, 0.5 = mitad de frecuencia)
+            // Solo usado si isAnimated = true:
+            frameWidth: 128.14, // Ancho de cada frame del sprite (897 / 7 frames)
+            frameHeight: 199, // Alto del sprite sheet
+            frames: 7, // Número de frames en el sprite sheet
+            animationKey: 'obstacle1-run', // Key de la animación
+            animationFrameRate: 10, // FPS de animación
+            animationStart: 0 // Frame inicial de la animación
+          },
+          // Obstáculo 2 (Jugador azul - animado, corre más rápido)
+          obstacle2: {
+            active: true, // true = usar este obstáculo, false = no usar
+            key: 'obstacle2',
+            path: 'obstacle2.png',
+            scale: 0.4,
+            isAnimated: true, // true = sprite animado que corre en contra, false = estático que se mueve con background
+            speed: 4, // Velocidad individual (más rápido que obstacle1)
+            groundY: 300, // Posición Y en modo runner (donde aparece el obstáculo) - ajustar según canvas
+            spawnWeight: 2, // Peso de aparición (1 = normal, 2 = doble frecuencia, 0.5 = mitad de frecuencia)
+            frameWidth: 119.33, // Ancho de cada frame del sprite (716 / 6 frames)
+            frameHeight: 199, // Alto del sprite sheet
+            frames: 6, // Número de frames en el sprite sheet
+            animationKey: 'obstacle2-run',
+            animationFrameRate: 10,
+            animationStart: 0
+          }
+        },
+        // Configuración de líneas de salida y meta (assets verticales completos 288×599)
+        startLine: {
+          active: true,             // true = usar la línea de salida, false = no mostrar
+          width: 288,               // Ancho original del asset
+          height: 599,              // Alto original del asset
+          x: 160,                   // Posición X de la línea de salida (borde izquierdo)
+          y: 240,                   // Posición Y (centro vertical del canvas)
+          scaleToHeight: false,     // true = escalar automáticamente al alto, false = usar scale manual
+          targetHeight: 600,        // Altura objetivo cuando scaleToHeight = true (null = altura del canvas)
+          scale: 1.2,               // Escala manual cuando scaleToHeight = false (ej: 0.5, 1.5, 2)
+          rotation: 0,              // Rotación en grados (0 = sin rotación)
+          flipX: false,             // Voltear horizontalmente
+          flipY: false              // Voltear verticalmente
+        },
+        finishLine: {
+          active: true,             // true = usar la línea de meta, false = no mostrar
+          width: 288,               // Ancho original del asset
+          height: 599,              // Alto original del asset
+          x: 140,                   // Posición X al borde derecho del canvas (fija, no se mueve)
+          y: 240,                   // Posición Y (centro vertical del canvas)
+          scaleToHeight: false,     // true = escalar automáticamente al alto, false = usar scale manual
+          targetHeight: 600,        // Altura objetivo cuando scaleToHeight = true (null = altura del canvas)
+          scale: 1.2,               // Escala manual cuando scaleToHeight = false (ej: 0.5, 1.5, 2)
+          showAtTime: 2,            // Mostrar línea de meta cuando queden estos segundos
+          rotation: 0,              // Rotación en grados (0 = sin rotación)
+          flipX: false,             // Voltear horizontalmente
+          flipY: false              // Voltear verticalmente
+        },
+        // Configuración de la meta
+        goal: {
+          playerFinalX: null,   // Posición X final del player (null = calculada con offset)
+          playerFinalY: null,   // Posición Y final del player (null = mantiene la Y actual del carril)
+          offset: 70,           // Distancia desde el borde derecho (usado si playerFinalX es null)
+          duration: 1000,       // Duración del movimiento hacia la meta (ms)
+          animationDelay: 2000  // Tiempo de espera después de llegar a la meta antes de terminar (ms)
+        },
+
+        // Configuración de UI
+        ui: {
+          timerLabel: 'Tiempo:', // Etiqueta del timer
+          scoreLabel: 'Score:', // Etiqueta del score
+          timerSelector: '#timer-display', // Selector DOM del timer
+          scoreSelector: '#score-display', // Selector DOM del score
+          useExternalUI: true // Usar elementos DOM externos
+        },
+
+        // Configuración del conteo regresivo inicial
+        countdown: {
+          enabled: true,        // Activar conteo regresivo
+          duration: 3,          // Duración en segundos (3, 2, 1)
+          textStyle: {          // Estilo del texto del conteo
+            fontSize: '72px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 8
+          }
+        },
+
+        // Rutas de assets
+        assets: {
+          basePath: 'assets/', // Carpeta base de assets
+          // Los assets de background se cargan desde background.landscape y background.track
+          startLine: {
+            key: 'start',
+            path: 'start.png'
+          },
+          finishLine: {
+            key: 'finish',
+            path: 'goal.png'
+          },
+          player: {
+            key: 'player',
+            path: 'player.png'
+          }
+          // Los assets de obstáculos se cargan dinámicamente desde obstacles.obstacle1 y obstacles.obstacle2
+        },
+
+        // Configuración de fin de juego
+        endGame: {
+          restartDelay: 4000 // Delay en ms antes de reiniciar el juego después del callback
+        },
+
+        // Callback al terminar el juego
+        endGameCallback: function({win, score, scene}) {
+          const message = win
+            ? `¡Felicidades! Completaste el juego con ${score} puntos.`
+            : `Juego terminado. Score final: ${score}`;
+          alert(message);
+
+          // Usar el delay configurado
+          const restartDelay = scene.config.endGame?.restartDelay || 1000;
+          setTimeout(() => {
+            scene.scene.restart();
+          }, restartDelay);
+        }
+      };
+    </script>
+    <script src="https://s0.2mdn.net/creatives/assets/5478760/phaser.min.js"></script>
+    <script src="main.js"></script>
+    <script>
+      const config = {
+        type: Phaser.AUTO,
+        width: 300,
+        height: 600,
+        transparent: true,
+        parent: "phaser-example",
+        backgroundColor: '#000000',
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+        physics: {
+          default: 'arcade',
+          arcade: {
+            gravity: { y: 0 },
+            debug: false
+          }
+        },
+        scene: [Preloader, Play]
+      };
+
+      window.game = new Phaser.Game(config);
+    </script>
+</body></html>
