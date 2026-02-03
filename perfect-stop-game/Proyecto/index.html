@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Perfect Stop Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+    }
+    #phaser-game {
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+    #controls {
+      display: flex;
+      gap: 15px;
+      margin-top: 10px;
+    }
+    .game-btn {
+      padding: 12px 35px;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    #stop-btn {
+      background: linear-gradient(145deg, #e94560, #c73e54);
+      color: white;
+      box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+    }
+    #stop-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(233, 69, 96, 0.6);
+    }
+    #stop-btn:disabled {
+      background: #666;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    #restart-btn {
+      background: linear-gradient(145deg, #0f3460, #16213e);
+      color: #e94560;
+      border: 2px solid #e94560;
+    }
+    #restart-btn:hover {
+      background: #e94560;
+      color: white;
+      transform: translateY(-2px);
+    }
+    #debug-info {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.8);
+      color: #0f0;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      border-radius: 5px;
+      display: none;
+      z-index: 1000;
+    }
+    #debug-info.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="debug-info">
+    <div>Target X: <span id="dbg-target">-</span></div>
+    <div>Nearest X: <span id="dbg-current">-</span></div>
+    <div>Diff px: <span id="dbg-diff">-</span></div>
+  </div>
+
+  <div id="game-container">
+    <div id="phaser-game"></div>
+    <div id="controls">
+      <button id="stop-btn" class="game-btn">STOP</button>
+      <button id="restart-btn" class="game-btn">RESTART</button>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // CONFIGURACION DEL JUEGO - PERFECT STOP
+    // Tipo: Carrusel 2D horizontal
+    // ==========================================
+    window.GAME_CONFIG = {
+      // Dimensiones del canvas
+      width: 300,
+      height: 600,
+
+      // Configuracion de dificultad
+      difficulty: {
+        tolerancePx: 15,           // Pixeles de tolerancia para ganar
+        speed: 4,                  // Velocidad del carrusel (1 = lento, 10 = insano)
+        curveExponent: 0.6,        // Exponente para curva de porcentaje
+        referenceSpinner: 0,       // Indice del spinner de referencia (0 = primero, 1 = segundo, etc.)
+                                   // Usar -1 o 'all' para que cualquier spinner cuente
+        maxAttempts: 3             // Numero de intentos permitidos
+      },
+
+      // Configuracion del carrusel 2D
+      carousel: {
+        centerY: 300,              // Posicion Y del carrusel
+        spacing: 300,              // Espacio entre cada spinner (px) - mas separados
+        totalWidth: 800            // Ancho total del carrusel (para wrap)
+      },
+
+      // Target (sombra fija donde debe alinearse)
+      target: {
+        key: 'target',
+        path: 'assets/target.png',
+        scale: 0.2,
+        x: 150,                    // Posicion X del target (centro del canvas)
+        y: 300                     // Posicion Y del target
+      },
+
+      // Spinners que se mueven en el carrusel
+      spinners: [
+        { key: 'spinner', path: 'assets/spinner.png', scale: 0.2},
+        { key: 'spinner2', path: 'assets/spinner2.png', scale: 0.2 },
+        { key: 'spinner3', path: 'assets/spinner3.png', scale: 0.2 }
+      ],
+
+      // Efectos visuales
+      effects: {
+        win: {
+          glowColor: 0xFFD700,
+          glowAlpha: 0.6,
+          glowScale: 1.15,
+          particleCount: 30,
+          particleDuration: 800,
+          shakeIntensity: 0.005,
+          shakeDuration: 150,
+          popScale: 1.2,
+          popDuration: 200
+        },
+        lose: {
+          shakeIntensity: 0.015,
+          shakeDuration: 200,
+          meterWidth: 200,
+          meterHeight: 20,
+          meterY: 450
+        }
+      },
+
+      // Textos del UI
+      ui: {
+        winText: 'GANASTE!',
+        loseText: 'CASI...',
+        resultY: 80,
+        fontSize: '32px',
+        fontFamily: 'Arial Black, sans-serif'
+      },
+
+      // Controles (IDs de los elementos HTML)
+      controls: {
+        stopBtnId: 'stop-btn',
+        restartBtnId: 'restart-btn'
+      },
+
+      // Fondo
+      background: {
+        color: 0x1a1a2e
+      }
+    };
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script src="main.js"></script>
+
+  <script>
+    const config = {
+      type: Phaser.AUTO,
+      width: window.GAME_CONFIG.width,
+      height: window.GAME_CONFIG.height,
+      parent: 'phaser-game',
+      backgroundColor: window.GAME_CONFIG.background.color,
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+      },
+      scene: [PreloaderScene, GameScene]
+    };
+
+    window.game = new Phaser.Game(config);
+  </script>
+</body>
+</html>
