@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Drag and Drop Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-color: #1a1a2e;
+      font-family: Arial, sans-serif;
+      gap: 20px;
+    }
+
+    #game-container {
+      position: relative;
+      width: 300px;
+      height: 600px;
+      background-color: #f5f5f5;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    #game-container canvas {
+      display: block;
+    }
+
+    #layout-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .layout-btn {
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background-color: #4a5568;
+      color: white;
+      transition: all 0.2s ease;
+    }
+
+    .layout-btn:hover {
+      background-color: #2d3748;
+      transform: translateY(-2px);
+    }
+
+    .layout-btn.active {
+      background-color: #38a169;
+      box-shadow: 0 2px 8px rgba(56, 161, 105, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <script>
+    /**
+     * =====================================================
+     * CONFIGURACIÓN DEL JUEGO DRAG AND DROP
+     * =====================================================
+     *
+     * Este objeto contiene toda la configuración del juego.
+     * Modifica los valores según tus necesidades.
+     *
+     * MECÁNICA DEL JUEGO:
+     * - El jugador debe arrastrar los items hacia el contenedor central
+     * - Cada item colocado correctamente llena un icono del progress bar
+     * - El juego termina cuando se colocan todos los items o se acaba el tiempo
+     */
+    window.GAME_CONFIG = {
+
+      // ===================================================
+      // DIMENSIONES DEL JUEGO
+      // ===================================================
+      width: 300,   // Ancho del canvas en píxeles
+      height: 600,  // Alto del canvas en píxeles
+
+      // ===================================================
+      // DISTRIBUCIÓN DE ITEMS (LAYOUT)
+      // ===================================================
+      // Opciones disponibles:
+      //   - "top-bottom": Items arriba y abajo del contenedor
+      //   - "left-bottom": Items a la izquierda y abajo del contenedor
+      //   - "left-right": Items a la izquierda y derecha del contenedor
+      layout: "top-bottom",
+
+      // ===================================================
+      // ESPACIADO DEL LAYOUT
+      // ===================================================
+      // Controla la posición de los items según el layout elegido
+      layoutSpacing: {
+        itemsTop: 230,      // Posición Y de los items superiores (desde el top)
+        itemsBottom: 50,    // Distancia de items inferiores desde el bottom
+        itemsLeft: 50,      // Posición X de items a la izquierda
+        itemsRight: 50,     // Distancia de items a la derecha desde el borde
+        itemGap: 70         // Espacio vertical entre items (para layouts laterales)
+      },
+
+      // ===================================================
+      // CONTENEDOR CENTRAL (DROP ZONE)
+      // ===================================================
+      // El área donde el jugador debe soltar los items
+      container: {
+        key: "container",       // Identificador interno del asset
+        path: "container.png",  // Ruta del archivo de imagen
+        scale: 0.25,            // Escala del contenedor (0.25 = 25% del tamaño original)
+        dropZoneRadius: 60,     // Radio en píxeles para detectar el drop
+        offsetY: 70             // Desplazamiento vertical desde el centro (+ = abajo, - = arriba)
+      },
+
+      // ===================================================
+      // ITEMS ARRASTRABLES
+      // ===================================================
+      itemCount: 6,           // Cantidad de items a mostrar
+      assetsPath: "assets/",  // Carpeta donde están los assets
+
+      // Lista de items arrastrables
+      // Cada item necesita:
+      //   - key: Identificador único interno
+      //   - path: Nombre del archivo de imagen
+      //   - title: Texto que aparece sobre el item (opcional si itemTitle.active = false)
+      //   - scale: Tamaño del item (1 = 100%, 0.5 = 50%, etc.)
+      items: [
+        { key: "item-1", path: "item-1.png", title: "Detectores de apertura y movimiento", scale: 0.2 },
+        { key: "item-2", path: "item-2.png", title: "App Prosegur Smart", scale: 0.2 },
+        { key: "item-3", path: "item-3.png", title: "Disuasión efectiva", scale: 0.2 },
+        { key: "item-4", path: "item-4.png", title: "Cámaras monitoreadas", scale: 0.2 },
+        { key: "item-5", path: "item-5.png", title: "Teclado", scale: 0.2 },
+        { key: "item-6", path: "item-6.png", title: "Panel central", scale: 0.2 }
+      ],
+
+      // ===================================================
+      // BARRA DE PROGRESO (ICONOS SUPERIORES)
+      // ===================================================
+      // Muestra el progreso del jugador con iconos que se llenan
+      progressBar: {
+        title: "Nivel de seguridad",  // Texto del título
+        titleFont: "18px Arial",      // Fuente del título
+        titleColor: "#333333",        // Color del título (hexadecimal)
+        titleY: 30,                   // Posición Y del título
+
+        iconKey: "progress-icon",     // Identificador del icono
+        iconPath: "progress-icon.svg",// Archivo del icono (SVG o PNG)
+        iconScale: 0.25,              // Tamaño del icono
+
+        emptyAlpha: 0.3,              // Opacidad cuando está vacío (0-1)
+        filledAlpha: 1,               // Opacidad cuando está lleno (0-1)
+        emptyTint: 0x999999,          // Color del icono vacío (hexadecimal sin #)
+        filledTint: 0x38a169,         // Color del icono lleno (verde por defecto)
+
+        y: 70,                        // Posición Y de los iconos
+        spacing: 35                   // Espacio horizontal entre iconos
+      },
+
+      // ===================================================
+      // ANIMACIONES
+      // ===================================================
+      animations: {
+        // Animación de entrada de los items al iniciar
+        itemEntry: {
+          duration: 400,          // Duración en milisegundos
+          ease: "Back.easeOut",   // Tipo de ease (ver documentación de Phaser)
+          stagger: 100            // Delay entre cada item (efecto cascada)
+        },
+
+        // Animación cuando se suelta un item correctamente
+        dropSuccess: {
+          scaleBounce: 0.3,       // Escala del rebote del contenedor
+          duration: 200,          // Duración del rebote
+          particleCount: 8        // Cantidad de partículas de celebración
+        },
+
+        // Efecto visual al arrastrar un item
+        drag: {
+          scale: 1.1,             // Escala del item mientras se arrastra
+          alpha: 0.8              // Opacidad mientras se arrastra
+        }
+      },
+
+      // ===================================================
+      // TEMPORIZADOR
+      // ===================================================
+      timer: {
+        enabled: true,      // true = activar timer, false = sin límite de tiempo
+        timeLimit: 10,      // Segundos para completar el juego
+        display: true,      // Mostrar el contador en pantalla
+        warningTime: 5,     // Segundos restantes para mostrar advertencia (rojo)
+        offsetY: 40,        // Posición Y del timer (offset desde progress bar)
+        onTimeUp: null      // Callback cuando se acaba el tiempo (función)
+      },
+
+      // ===================================================
+      // INTERFAZ DE USUARIO (UI)
+      // ===================================================
+      ui: {
+        // Configuración del título de cada item
+        itemTitle: {
+          active: true,           // true = mostrar títulos, false = ocultar
+          fontSize: "12px",       // Tamaño de fuente
+          fontFamily: "Arial",    // Familia de fuente
+          fontStyle: "bold",      // Estilo: "normal", "bold", "italic", "bold italic"
+          color: "#fff",          // Color del texto
+          maxWidth: 80,           // Ancho máximo antes de hacer salto de línea
+          align: "center",        // Alineación: "left", "center", "right"
+          offsetY: -50            // Posición respecto al item (- = arriba, + = abajo)
+        },
+
+        // Mensajes de fin de juego
+        winText: "¡Completado!",      // Texto cuando gana
+        loseText: "¡Tiempo agotado!", // Texto cuando pierde
+
+        // Callback al finalizar el juego
+        // Recibe un parámetro: endGameCallback(win) donde win es true/false
+        endGameCallback: null
+      },
+
+      // ===================================================
+      // FONDO DEL JUEGO
+      // ===================================================
+      background: {
+        color: "#ffd000",     // Color de fondo (se usa si no hay imagen)
+        image: null,          // Key de la imagen de fondo (null = solo color)
+        imagePath: null,      // Ruta de la imagen de fondo
+        scale: 1              // Escala de la imagen de fondo
+      }
+    };
+  </script>
+
+  <!-- Layout controls (ocultos por ahora)
+  <div id="layout-controls">
+    <button class="layout-btn active" data-layout="top-bottom">⬆️ Top-Bottom ⬇️</button>
+    <button class="layout-btn" data-layout="left-bottom">⬅️ Left-Bottom ⬇️</button>
+    <button class="layout-btn" data-layout="left-right">⬅️ Left-Right ➡️</button>
+  </div>
+  -->
+
+  <div id="game-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script src="main.js"></script>
+
+  <script>
+    const config = {
+      type: Phaser.AUTO,
+      width: window.GAME_CONFIG.width,
+      height: window.GAME_CONFIG.height,
+      parent: 'game-container',
+      backgroundColor: window.GAME_CONFIG.background.color,
+      scene: [PreloaderScene, GameScene]
+    };
+
+    window.game = new Phaser.Game(config);
+
+    // Layout button controls
+    document.querySelectorAll('.layout-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const newLayout = this.dataset.layout;
+
+        // Update active button
+        document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+
+        // Update config and restart scene
+        window.GAME_CONFIG.layout = newLayout;
+        window.game.scene.start('GameScene');
+      });
+    });
+  </script>
+</body>
+</html>
