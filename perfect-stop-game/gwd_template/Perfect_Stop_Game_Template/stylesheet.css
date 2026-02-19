@@ -1,0 +1,26 @@
+@font-face {
+    font-family: 'MrEavesXLSanNarOTUltra';
+    src: url('MrEavesXLSanNarOT-Ultra.eot');
+    src: url('MrEavesXLSanNarOT-Ultra.eot') format('embedded-opentype'),
+        url('MrEavesXLSanNarOT-Ultra.woff2') format('woff2'),
+        url('MrEavesXLSanNarOT-Ultra.woff') format('woff'),
+        url('MrEavesXLSanNarOT-Ultra.ttf') format('truetype'),
+        url('MrEavesXLSanNarOT-Ultra.svg') format('svg');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'LC Script';
+    src: url('LCScript-Regular.eot');
+    src: url('LCScript-Regular.eot') format('embedded-opentype'),
+        url('LCScript-Regular.woff2') format('woff2'),
+        url('LCScript-Regular.woff') format('woff'),
+        url('LCScript-Regular.ttf') format('truetype'),
+        url('LCScript-Regular.svg') format('svg');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
