@@ -36,6 +36,11 @@ class PreloaderScene extends Phaser.Scene {
       progressBox.destroy();
     });
 
+    // Cargar imagen de fondo si está configurada
+    if (gameConfig.background?.image) {
+      this.load.image('background', gameConfig.background.image);
+    }
+
     // Cargar target (sombra)
     this.load.image(gameConfig.target.key, gameConfig.target.path);
 
@@ -177,7 +182,16 @@ class GameScene extends Phaser.Scene {
   }
 
   createBackground(centerX) {
-    // Fondo limpio, sin marcos ni lineas
+    const width = this.cameras.main.width;
+    const height = this.cameras.main.height;
+
+    // Si hay imagen de fondo configurada y cargada, usarla
+    if (gameConfig.background?.image && this.textures.exists('background')) {
+      const bg = this.add.image(width / 2, height / 2, 'background');
+      bg.setDisplaySize(width, height);
+      bg.setDepth(0);
+    }
+    // Si no hay imagen, el color de fondo ya está configurado en el config de Phaser
   }
 
   createTarget() {

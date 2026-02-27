@@ -144,6 +144,8 @@ class Play extends Phaser.Scene {
     this.isGameOver = false;
     this.hasReachedGoal = false;
     this.isMovingToGoal = false; // Flag para indicar que se está moviendo a la meta
+    this.finishLineShown = false; // Flag para controlar si ya se mostró la línea de meta
+    this.stopObstacleSpawning = false; // Flag para detener spawning de obstáculos
 
     // Variables para modo runner (salto)
     this.isJumping = false; // Flag para saber si está saltando
@@ -202,15 +204,6 @@ class Play extends Phaser.Scene {
     // Configuración del background con parallax (dos capas)
     const bgConfig = this.config.background;
 
-    // Calcular ancho extendido para el background
-    // Necesitamos cubrir el movimiento del jugador hacia la meta
-    const finishLineConfigTemp = this.config.finishLine || {};
-    const finishLineWidth = finishLineConfigTemp.width || 300;
-
-    // Ancho extendido = ancho canvas + espacio para la animación final
-    const extraWidth = 200 + finishLineWidth; // Espacio suficiente para la animación
-    const extendedWidth = width + extraWidth;
-
     // Capa 1: Landscape (fondo - más lento)
     const landscapeConfig = bgConfig.landscape;
     const landscapeScale = landscapeConfig.scale || 1;
@@ -220,7 +213,7 @@ class Play extends Phaser.Scene {
     this.bgLandscape = this.add.tileSprite(
       landscapeOffsetX,
       (height / 2) + landscapeOffsetY,
-      extendedWidth, // Usar ancho extendido
+      width,
       height,
       landscapeConfig.key
     )
@@ -237,7 +230,7 @@ class Play extends Phaser.Scene {
     this.bgTrack = this.add.tileSprite(
       trackOffsetX,
       (height / 2) + trackOffsetY,
-      extendedWidth, // Usar ancho extendido
+      width,
       height,
       trackConfig.key
     )
@@ -279,16 +272,7 @@ class Play extends Phaser.Scene {
     // Crear línea de meta (invisible al inicio) - Asset vertical completo (solo si está activa)
     const finishLineConfig = this.config.finishLine || {};
     if (finishLineConfig.active) {
-      // Calcular posición X en el mundo del juego (donde el player terminará)
-      let finishLineX;
-      if (finishLineConfig.positionAtTrackEnd) {
-        // Posicionar donde el player llegará al final
-        finishLineX = width + 100; // Posición fija para la animación final
-      } else {
-        // Usar posición X configurada manualmente
-        finishLineX = finishLineConfig.x || (width + 100);
-      }
-
+      const finishLineX = finishLineConfig.x || (width + 100);
       const finishLineY = finishLineConfig.y || (height / 2);
 
       // Calcular escala: automática (scaleToHeight) o manual (scale)
@@ -312,7 +296,7 @@ class Play extends Phaser.Scene {
         .setFlipX(finishLineFlipX)
         .setFlipY(finishLineFlipY)
         .setDepth(5) // Por encima del track (depth 2) pero debajo de jugadores (depth 8-12)
-        .setScrollFactor(1) // Fija a pantalla
+        .setScrollFactor(0) // Fija a pantalla
         .setVisible(false); // Oculta hasta el dash final
     } else {
       this.finishLine = null; // No crear línea de meta
@@ -547,13 +531,15 @@ class Play extends Phaser.Scene {
         this.timeLeft--;
         this.updateTimerDisplay();
 
-        if (this.timeLeft <= 0) {
-          this.finishLine.setX(210).setVisible(true);
+        // Detener obstáculos 1 segundo antes de terminar
+        if (this.timeLeft === 1) {
+          this.stopObstacleSpawning = true;
+        }
 
-          // Pausar el timer en 0
+        if (this.timeLeft <= 0) {
           this.timeLeft = 0;
           this.updateTimerDisplay();
-          this.timerEvent.paused = true; // Detener el timer
+          this.timerEvent.paused = true;
 
           // Disparar el dash final SOLO cuando el timer llega a 0
           if (!this.isMovingToGoal) {
@@ -571,20 +557,19 @@ class Play extends Phaser.Scene {
     this.isMovingToGoal = true;
     this.canMove = false;
 
-    const duration = 2000; // Duración de 1.5 segundos
+    const duration = 3000; // Duración de 3 segundos
 
     // Detener inmediatamente el scroll del background
     const bgConfig = this.config.background;
     bgConfig.landscape.scrollSpeed = 0;
     bgConfig.track.scrollSpeed = 0;
 
-    // Posicionar y mostrar la meta más hacia el centro
+    // Posicionar y mostrar la meta
     if (this.finishLine) {
-      // Posicionar la meta más centrada en la pantalla para que sea más visible
-      console.log('Posición de la línea de meta X:', 210);
+      this.finishLine.setX(210).setVisible(true);
 
       // El jugador debe moverse hasta casi tocar la meta
-      const targetX = 230
+      const targetX = 230;
 
       // Animar jugador hacia la meta
       this.tweens.add({
@@ -594,7 +579,7 @@ class Play extends Phaser.Scene {
         ease: 'Quad.easeOut',
         onStart: () => {
           if (this.player.anims) {
-            // Reproducir animación más lenta (50% de la velocidad normal)
+            // Reproducir animación más lenta (frameRate reducido)
             this.player.play({ key: 'run', frameRate: 5 });
           }
         },
@@ -634,7 +619,7 @@ class Play extends Phaser.Scene {
   }
 
   scheduleNextObstacle() {
-    if (this.isGameOver || this.isMovingToGoal) return; // No spawear más obstáculos si va a la meta
+    if (this.isGameOver || this.isMovingToGoal || this.stopObstacleSpawning) return; // No spawear más obstáculos
 
     const delay = Phaser.Math.Between(
       this.config.obstacles.minSpawnInterval,
