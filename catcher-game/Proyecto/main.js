@@ -84,7 +84,9 @@ class MainScene extends Phaser.Scene {
         const x = Phaser.Math.Between(20, 280);
         const type = randomIngredient(this.configData);
         const sprite = this.ingredients.create(x, 0, type);
-        sprite.setCircle(16);
+        const itemScale = this.configData.items.scale || 1;
+        sprite.setScale(itemScale);
+        sprite.setCircle(16 * itemScale);
         sprite.setData("type", type);
         sprite.setBounce(0.3);
         sprite.setVelocityY(this.fallSpeed);

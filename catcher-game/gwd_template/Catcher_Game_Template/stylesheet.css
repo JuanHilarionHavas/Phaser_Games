@@ -1,0 +1,13 @@
+@font-face {
+    font-family: 'AmsiPro';
+    src: url('AmsiPro-Bold.eot');
+    src: url('AmsiPro-Bold.eot') format('embedded-opentype'),
+        url('AmsiPro-Bold.woff2') format('woff2'),
+        url('AmsiPro-Bold.woff') format('woff'),
+        url('AmsiPro-Bold.ttf') format('truetype'),
+        url('AmsiPro-Bold.svg') format('svg');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+

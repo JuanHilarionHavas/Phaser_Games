@@ -272,22 +272,28 @@
       items: [
         {
           key: "camara",
-          path: "CamaraSeguridad.png",
+          spritePath: "sprite-cam-seg.png",    // Sprite con 2 frames: izq=idle, der=drag
+          frameWidth: 100,                       // Ancho de cada frame (mitad del sprite)
+          frameHeight: 100,                     // Alto del sprite
           title: "Camara de\nSeguridad",
           description: "Monitoreo 24/7 con video en tiempo real conectado a la central de Prosegur",
           showDescription: true,
-          scale: 1,                      // Escala del item arrastrando
-          dropScale: 0.7,                // Escala del item despues del drop
+          isBadItem: false,                    // true = item malo, false = item bueno
+          scale: 1,
+          dropScale: 0.7,
           x: 55,
           y: 200,
           dropZone: { x: 80, y: 300 }
         },
         {
           key: "panel",
-          path: "PanelCentral.png",
+          spritePath: "sprite-panel.png",
+          frameWidth: 100,
+          frameHeight: 100,
           title: "Panel\nCentral",
           description: "Es el cerebro del Sistema de alarmas conectando con la central de monitoreo de Prosegur",
           showDescription: true,
+          isBadItem: true,
           scale: 1,
           dropScale: 0.7,
           x: 150,
@@ -296,10 +302,13 @@
         },
         {
           key: "detector",
-          path: "Detector.png",
+          spritePath: "sprite-detector.png",
+          frameWidth: 100,
+          frameHeight: 100,
           title: "Detectores de\nmovimiento",
           description: "Sensores inteligentes que detectan cualquier movimiento sospechoso en tu hogar",
           showDescription: true,
+          isBadItem: false,
           scale: 1,
           dropScale: 0.5,
           x: 245,
@@ -307,6 +316,17 @@
           dropZone: { x: 210, y: 350 }
         }
       ],
+
+      // ===================================================
+      // EFECTO DE PANTALLA ROJA (BAD ITEMS)
+      // ===================================================
+      badItemEffect: {
+        enabled: true,
+        flashColor: 0xff0000,
+        flashAlpha: 0.5,
+        flashDuration: 300,
+        flashCount: 2
+      },
 
       // ===================================================
       // POPUP DE INFORMACION
