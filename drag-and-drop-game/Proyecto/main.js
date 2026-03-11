@@ -123,6 +123,7 @@ class GameScene extends Phaser.Scene {
   init() {
     this.droppedCount = 0;
     this.totalItems = gameConfig.itemCount;
+    this.goodItemCount = gameConfig.items.filter(item => !item.isBadItem).length;
     this.gameOver = false;
     this.items = [];
     this.dropZones = [];
@@ -183,9 +184,9 @@ class GameScene extends Phaser.Scene {
   createDropZones() {
     const dzConfig = gameConfig.dropZones;
 
-    // Create drop zone for each item based on item's dropZone config
+    // Create drop zone only for good items based on item's dropZone config
     gameConfig.items.forEach((item, index) => {
-      if (!item.dropZone) return;
+      if (!item.dropZone || item.isBadItem) return;
 
       const zoneX = item.dropZone.x;
       const zoneY = item.dropZone.y;
@@ -513,8 +514,8 @@ class GameScene extends Phaser.Scene {
       );
     }
 
-    // Check win condition
-    if (this.droppedCount >= this.totalItems) {
+    // Check win condition (only good items count)
+    if (this.droppedCount >= this.goodItemCount) {
       this.time.delayedCall(gameConfig.infoPopup.showDuration + 500, () => {
         this.endGame(true);
       });
