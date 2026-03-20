@@ -10,7 +10,7 @@ class PreloaderScene extends Phaser.Scene {
   }
 
   preload() {
-    gameConfig = window.GAME_CONFIG;
+    gameConfig = window.gwd.GAME_CONFIG;
     const basePath = gameConfig.assetsPath;
 
     // Load background image if configured
@@ -104,7 +104,6 @@ class PreloaderScene extends Phaser.Scene {
       dragGraphics.fillStyle(0x333333, 0.8);
       dragGraphics.fillCircle(30, 30, 25);
       dragGraphics.fillStyle(0xffffff, 1);
-      // Draw hand icon approximation
       dragGraphics.fillRect(25, 20, 10, 25);
       dragGraphics.generateTexture(gameConfig.dragIndicator.key, 60, 60);
       dragGraphics.destroy();
@@ -130,54 +129,41 @@ class GameScene extends Phaser.Scene {
     this.dropZoneCircles = [];
     this.dragIndicator = null;
     this.hasStartedDragging = false;
-    this.droppedItems = new Set(); // Track which items have been dropped
-    this.redFlashOverlay = null;   // Red flash overlay for bad items
+    this.droppedItems = new Set();
+    this.redFlashOverlay = null;
   }
 
   create() {
-    // Create background color/image
     this.createBackground();
-
-    // Create container (plano de casa)
     this.createContainer();
-
-    // Create drop zone circles (only for good items)
     this.createDropZones();
-
-    // Create draggable items
     this.createDraggableItems();
-
-    // Create drag indicator (on top of items)
     this.createDragIndicator();
-
-    // Create red flash overlay for bad items
     this.createRedFlashOverlay();
-
-    // Setup drag events
     this.setupDragEvents();
-
-    // Animate items entry
     this.animateItemsEntry();
   }
 
   createBackground() {
-    // Background is handled by CSS/HTML (color or image)
-    // This method can load a background image if configured
     if (gameConfig.background.image && this.textures.exists(gameConfig.background.image)) {
       const bgScale = gameConfig.background.scale || 1;
       this.add.image(gameConfig.width / 2, gameConfig.height / 2, gameConfig.background.image)
         .setScale(bgScale);
+    } else if (gameConfig.background.color) {
+      // Draw solid color background rectangle
+      const colorInt = Phaser.Display.Color.HexStringToColor(gameConfig.background.color).color;
+      this.add.rectangle(gameConfig.width / 2, gameConfig.height / 2, gameConfig.width, gameConfig.height, colorInt)
+        .setDepth(0);
     }
   }
 
   createContainer() {
-    // Create the container (plano de casa)
     const containerCfg = gameConfig.container;
     if (containerCfg && this.textures.exists(containerCfg.key)) {
       const containerY = containerCfg.y || gameConfig.height / 2;
       this.container = this.add.image(gameConfig.width / 2, containerY, containerCfg.key)
         .setScale(containerCfg.scale || 1)
-        .setDepth(1);  // Container at depth 1
+        .setDepth(1);
     }
   }
 
@@ -187,20 +173,18 @@ class GameScene extends Phaser.Scene {
     // Create drop zone only for good items (skip bad items)
     gameConfig.items.forEach((item, index) => {
       if (!item.dropZone) return;
-      if (item.isBadItem) return;  // Skip bad items
+      if (item.isBadItem) return;
 
       const zoneX = item.dropZone.x;
       const zoneY = item.dropZone.y;
 
-      // Create visual circle - at depth 2 to be above container
       const circle = this.add.image(zoneX, zoneY, dzConfig.circleKey)
         .setScale(dzConfig.circleScale)
         .setAlpha(1)
-        .setDepth(2);  // Circles above container
+        .setDepth(2);
 
       this.dropZoneCircles.push(circle);
 
-      // Store drop zone info
       this.dropZones.push({
         x: zoneX,
         y: zoneY,
@@ -215,14 +199,12 @@ class GameScene extends Phaser.Scene {
   createDraggableItems() {
     for (let i = 0; i < this.totalItems; i++) {
       const itemConfig = gameConfig.items[i];
-      // Use item's individual position (x, y) from config
       const itemX = itemConfig.x !== undefined ? itemConfig.x : 150;
       const itemY = itemConfig.y !== undefined ? itemConfig.y : 160;
       const itemScale = itemConfig.scale || 1;
       const showDescription = itemConfig.showDescription !== false;
       const isBadItem = itemConfig.isBadItem === true;
 
-      // Create item sprite - start with IDLE frame (frame 0 = left side with name)
       const item = this.add.sprite(itemX, -50, itemConfig.key, 0)
         .setInteractive({ draggable: true })
         .setData('index', i)
@@ -246,8 +228,6 @@ class GameScene extends Phaser.Scene {
     if (!gameConfig.dragIndicator.enabled) return;
 
     const di = gameConfig.dragIndicator;
-
-    // Use x, y directly from config
     const indicatorX = di.x;
     const indicatorY = di.y;
 
@@ -256,7 +236,6 @@ class GameScene extends Phaser.Scene {
       .setAlpha(0)
       .setDepth(1000);
 
-    // Add subtle animation
     this.tweens.add({
       targets: this.dragIndicator,
       y: indicatorY - 10,
@@ -268,7 +247,6 @@ class GameScene extends Phaser.Scene {
   }
 
   createRedFlashOverlay() {
-    // Create red overlay for bad item drops (hidden by default)
     if (gameConfig.badItemEffect && gameConfig.badItemEffect.enabled) {
       this.redFlashOverlay = this.add.rectangle(
         gameConfig.width / 2,
@@ -278,7 +256,7 @@ class GameScene extends Phaser.Scene {
         gameConfig.badItemEffect.flashColor || 0xff0000
       )
         .setAlpha(0)
-        .setDepth(2000);  // On top of everything
+        .setDepth(2000);
     }
   }
 
@@ -290,7 +268,6 @@ class GameScene extends Phaser.Scene {
     const flashDuration = effect.flashDuration || 300;
     const flashAlpha = effect.flashAlpha || 0.5;
 
-    // Flash animation
     this.tweens.add({
       targets: this.redFlashOverlay,
       alpha: flashAlpha,
@@ -304,7 +281,6 @@ class GameScene extends Phaser.Scene {
   animateItemsEntry() {
     const anim = gameConfig.animations.itemEntry;
 
-    // Animate items
     this.items.forEach((item, index) => {
       const finalX = item.getData('originalX');
       const finalY = item.getData('originalY');
@@ -322,7 +298,6 @@ class GameScene extends Phaser.Scene {
       });
     });
 
-    // Animate drag indicator
     if (this.dragIndicator) {
       this.tweens.add({
         targets: this.dragIndicator,
@@ -339,7 +314,6 @@ class GameScene extends Phaser.Scene {
     this.input.on('dragstart', (pointer, gameObject) => {
       if (this.gameOver) return;
 
-      // Hide drag indicator on first drag
       if (!this.hasStartedDragging && this.dragIndicator) {
         this.hasStartedDragging = true;
         this.tweens.add({
@@ -357,10 +331,8 @@ class GameScene extends Phaser.Scene {
       // SWAP TO DRAG FRAME (frame 1 = right side, image only)
       gameObject.setFrame(1);
 
-      // Bring to top
       this.children.bringToTop(gameObject);
 
-      // Scale and alpha effect
       const itemScale = gameObject.getData('originalScale') || 1;
       this.tweens.add({
         targets: gameObject,
@@ -369,7 +341,6 @@ class GameScene extends Phaser.Scene {
         duration: 100
       });
 
-      // Highlight valid drop zones
       this.highlightDropZones(true);
     });
 
@@ -385,7 +356,6 @@ class GameScene extends Phaser.Scene {
       const itemIndex = gameObject.getData('index');
       const isBadItem = gameObject.getData('isBadItem');
 
-      // Check if dropped on container area (for bad items)
       const isOnContainer = this.isOverContainer(gameObject.x, gameObject.y);
 
       // Handle BAD ITEM dropped on container
@@ -405,7 +375,6 @@ class GameScene extends Phaser.Scene {
           zone.x, zone.y
         );
 
-        // Check if item matches this zone AND is within drop radius
         if (distance <= zone.radius && zone.itemIndex === itemIndex) {
           matchedZone = zone;
           break;
@@ -418,24 +387,18 @@ class GameScene extends Phaser.Scene {
         this.returnToOriginalPosition(gameObject);
       }
 
-      // Remove highlight
       this.highlightDropZones(false);
     });
   }
 
   isOverContainer(x, y) {
-    // Check if position is over the container area
     if (!this.container) return false;
-
     const containerBounds = this.container.getBounds();
     return containerBounds.contains(x, y);
   }
 
   handleBadItemDrop(item) {
-    // Flash red screen
     this.flashRedScreen();
-
-    // Return item to original position with idle sprite
     this.returnToOriginalPosition(item);
   }
 
@@ -466,14 +429,11 @@ class GameScene extends Phaser.Scene {
     const itemIndex = item.getData('index');
     const itemConfig = gameConfig.items[itemIndex];
 
-    // Mark zone as occupied
     zone.occupied = true;
     this.droppedItems.add(itemIndex);
 
-    // Disable interaction
     item.disableInteractive();
 
-    // Animate item to drop zone - use dropScale from config if available
     const dropScale = itemConfig.dropScale !== undefined ? itemConfig.dropScale : 0.7;
     this.tweens.add({
       targets: item,
@@ -485,7 +445,6 @@ class GameScene extends Phaser.Scene {
       ease: 'Back.easeOut'
     });
 
-    // Hide the circle
     this.tweens.add({
       targets: zone.circle,
       alpha: 0,
@@ -493,10 +452,8 @@ class GameScene extends Phaser.Scene {
       duration: 200
     });
 
-    // Create particles
     this.createDropParticles(zone.x, zone.y);
 
-    // Update progress
     this.droppedCount++;
 
     // Update DOM progress bar
@@ -504,7 +461,7 @@ class GameScene extends Phaser.Scene {
       window.updateDOMProgress(this.droppedCount - 1);
     }
 
-    // Show info popup only if showDescription is true for this item
+    // Show info popup
     const showDescription = item.getData('showDescription');
     if (showDescription && gameConfig.infoPopup.enabled && window.showInfoPopup) {
       window.showInfoPopup(
@@ -577,11 +534,29 @@ class GameScene extends Phaser.Scene {
       }
     });
 
-    // Callback
-    if (gameConfig.endGameCallback && typeof gameConfig.endGameCallback === 'function') {
-      this.time.delayedCall(500, () => {
-        gameConfig.endGameCallback(win);
-      });
+    const endCfg = gameConfig.endGameCallback;
+    if (endCfg) {
+      // Set final score in the End_Page element
+      if (endCfg.finalScoreSelectorId) {
+        const scoreEl = document.getElementById(endCfg.finalScoreSelectorId);
+        if (scoreEl) {
+          scoreEl.innerText = this.droppedCount;
+        }
+      }
+
+      // Navigate to End_Page via GWD pagedeck
+      setTimeout(() => {
+        if (typeof gwd !== 'undefined' && gwd.actions && gwd.actions.gwdPagedeck) {
+          gwd.actions.gwdPagedeck.goToPage(
+            'pagedeck',
+            endCfg.page,
+            endCfg.type || 'none',
+            endCfg.delay_animation || 1000,
+            'ease-in-out',
+            'bottom'
+          );
+        }
+      }, endCfg.delay || 0);
     }
   }
 

@@ -387,11 +387,7 @@
     <div id="dom-footer">
       <div id="progress-container">
         <span id="progress-label">Nivel de<br>seguridad:</span>
-        <div id="progress-icons">
-          <img class="progress-icon empty" id="progress-icon-0" src="assets/Seguridad_Icon.png">
-          <img class="progress-icon empty" id="progress-icon-1" src="assets/Seguridad_Icon.png">
-          <img class="progress-icon empty" id="progress-icon-2" src="assets/Seguridad_Icon.png">
-        </div>
+        <div id="progress-icons"></div>
       </div>
       <div id="cta-container">
         <button id="cta-button" onclick="console.log('CTA clicked!')">Cotiza ahora</button>
@@ -410,6 +406,17 @@
 
   <script>
     const cfg = window.GAME_CONFIG;
+
+    // Generate progress icons based on good items count
+    const goodItemCount = cfg.items.filter(item => !item.isBadItem).length;
+    const progressIconsContainer = document.getElementById('progress-icons');
+    for (let i = 0; i < goodItemCount; i++) {
+      const img = document.createElement('img');
+      img.className = 'progress-icon empty';
+      img.id = `progress-icon-${i}`;
+      img.src = 'assets/Seguridad_Icon.png';
+      progressIconsContainer.appendChild(img);
+    }
 
     // Global function to update progress from Phaser
     window.updateDOMProgress = function(index) {
