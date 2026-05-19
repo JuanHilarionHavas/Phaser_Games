@@ -233,13 +233,20 @@ class PenaltyScene extends Phaser.Scene {
 
         // Dirección → X de llegada
         const angleRad = this.lockedAngleDeg * Math.PI / 180;
-        const targetX = CFG.background.size.width / 2 + Math.sin(angleRad) * CFG.shot.directionSpreadX;
+        let targetX = CFG.background.size.width / 2 + Math.sin(angleRad) * CFG.shot.directionSpreadX;
+
+        // Ángulo extremo → fuera automático (el balón vuela más allá del poste)
+        const isWide = Math.abs(this.lockedAngleDeg) >= CFG.shot.wideAngleThresholdDeg;
+        if (isWide) {
+            targetX = CFG.background.size.width / 2 + Math.sign(this.lockedAngleDeg) * (CFG.background.size.width * 0.62);
+        }
 
         // Potencia → banda y Y de llegada
         const bands = CFG.shot.heightBands;
         const land = CFG.shot.landingY;
         let band, targetY;
-        if (this.power <= bands.lowMax)       { band = 'low';  targetY = land.low; }
+        if (isWide)                           { band = 'wide'; targetY = land.mid; }
+        else if (this.power <= bands.lowMax)  { band = 'low';  targetY = land.low; }
         else if (this.power <= bands.midMax)  { band = 'mid';  targetY = land.mid; }
         else if (this.power <= bands.highMax) { band = 'high'; targetY = land.high; }
         else                                  { band = 'over'; targetY = land.over; }
@@ -340,7 +347,7 @@ class PenaltyScene extends Phaser.Scene {
         const tol = 8;
         const outsideX = x < CFG.goal.mouthLeft - tol || x > CFG.goal.mouthRight + tol;
         const outsideY = y < CFG.goal.crossbarY - tol || y > CFG.goal.groundY + tol;
-        if (band === 'over' || outsideX || outsideY) return 'miss';
+        if (band === 'wide' || band === 'over' || outsideX || outsideY) return 'miss';
 
         // Atajada: sólo si el arquero eligió la MISMA fila (high/low) que el balón
         // Y además: misma columna exacta, o columna adyacente + arquero físicamente cerca
