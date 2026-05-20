@@ -85,11 +85,39 @@ class PenaltyScene extends Phaser.Scene {
             .setDepth(2);
         this.keeper.play('keeper_idle');
 
+        // ----- Motion blur portero: ghost trail (2 copias) -----
+        this.keeperGhosts = [];
+        const keeperGhostAlphas = [0.2, 0.08];
+        for (let i = 0; i < 2; i++) {
+            const ghost = this.add.sprite(CFG.keeper.position.x, CFG.keeper.position.y, 'idle', 0)
+                .setOrigin(0.5, 1)
+                .setScale(CFG.keeper.scale)
+                .setAlpha(0)
+                .setDepth(1);
+            ghost._baseAlpha = keeperGhostAlphas[i];
+            this.keeperGhosts.push(ghost);
+        }
+        this._keeperGhostHistory = [];
+
         // ----- Balón -----
         this.ball = this.add.sprite(CFG.ball.startPos.x, CFG.ball.startPos.y, 'ball', 0)
             .setOrigin(0.5, 0.5)
             .setScale(CFG.ball.startScale)
             .setDepth(4);
+
+        // ----- Motion blur: ghost trail (3 copias con alpha decreciente) -----
+        this.ballGhosts = [];
+        const ghostAlphas = [0.25, 0.12, 0.05];
+        for (let i = 0; i < 3; i++) {
+            const ghost = this.add.sprite(CFG.ball.startPos.x, CFG.ball.startPos.y, 'ball', 0)
+                .setOrigin(0.5, 0.5)
+                .setScale(CFG.ball.startScale)
+                .setAlpha(0)
+                .setDepth(3);
+            ghost._baseAlpha = ghostAlphas[i];
+            this.ballGhosts.push(ghost);
+        }
+        this._ghostHistory = [];
 
         // ----- Flecha (DOM): se rota vía CSS transform -----
         this.arrowEl = document.querySelector(CFG.ui.arrowSelector);
@@ -283,57 +311,109 @@ class PenaltyScene extends Phaser.Scene {
         // Zona del balón (salvo que vaya fuera del arco/por encima del travesaño)
         const realBallZone = this.ballZone(targetX, targetY);
 
-        // IA del arquero: con aiBias, acierta la zona real del balón; sino elige
-        // una zona al azar (excluyendo over/miss).
+        // IA del arquero
         const allZones = Object.keys(CFG.keeper.zoneAnim);
         const keeperZone = (Math.random() < CFG.keeper.aiBias)
             ? realBallZone
             : Phaser.Utils.Array.GetRandom(allZones);
         this.keeperZone = keeperZone;
 
-        // Clavada al diveTimingPct del vuelo
-        this.time.delayedCall(CFG.shot.flightDurationMs * CFG.keeper.diveTimingPct, () => {
+        // Ocultar flecha DOM
+        if (this.arrowEl) this.arrowEl.classList.add('hidden');
+
+        // ===== EFECTO SQUASH AL PATEAR =====
+        const squashDur = 50;
+        this.tweens.add({
+            targets: this.ball,
+            scaleX: CFG.ball.startScale * 1.35,
+            scaleY: CFG.ball.startScale * 0.65,
+            duration: squashDur,
+            ease: 'Quad.easeOut',
+            yoyo: true,
+            onComplete: () => this._launchBall(CFG, targetX, targetY, band, keeperZone, isWide)
+        });
+    }
+
+    _launchBall(CFG, targetX, targetY, band, keeperZone, isWide) {
+        const flightMs = CFG.shot.flightDurationMs;
+
+        // Clavada del arquero al diveTimingPct del vuelo
+        this.time.delayedCall(flightMs * CFG.keeper.diveTimingPct, () => {
             this.animateKeeperDive(keeperZone);
         });
 
-        // Vuelo del balón: arranque muy rápido → desaceleración brusca (Expo.easeOut)
         const startX = this.ball.x;
         const startY = this.ball.y;
+
+        // Altura del arco parabólico según banda
+        const arcMap = { low: 15, mid: 35, high: 55, over: 70, wide: 30 };
+        const arcHeight = arcMap[band] || 30;
+
+        // Inicializar historial de ghost trail
+        this._ghostHistory = [];
 
         const proxy = { t: 0 };
         this.tweens.add({
             targets: proxy,
             t: 1,
-            duration: CFG.shot.flightDurationMs,
+            duration: flightMs,
             ease: CFG.ball.flightEase,
             onUpdate: () => {
                 const t = proxy.t;
-                this.ball.x = startX + (targetX - startX) * t;
-                this.ball.y = startY + (targetY - startY) * t;
+                const linearX = startX + (targetX - startX) * t;
+                const linearY = startY + (targetY - startY) * t;
+                // Arco parabólico: sube y baja con seno
+                const arc = Math.sin(t * Math.PI) * arcHeight;
+
+                // Guardar posición anterior para ghosts
+                this._ghostHistory.unshift({ x: this.ball.x, y: this.ball.y, scaleX: this.ball.scaleX, scaleY: this.ball.scaleY });
+                if (this._ghostHistory.length > 4) this._ghostHistory.pop();
+
+                this.ball.x = linearX;
+                this.ball.y = linearY - arc;
+
+                // Stretch dinámico: estira el balón en dirección del movimiento
+                const speed = t < 0.8 ? (1 - t) : 0.2;
+                const stretchFactor = 1 + speed * 0.2;
+                const baseScale = CFG.ball.startScale + (CFG.ball.endScale - CFG.ball.startScale) * t;
+                this.ball.setScale(baseScale * (1 / stretchFactor), baseScale * stretchFactor);
+
+                // Actualizar ghost trail
+                this.ballGhosts.forEach((ghost, i) => {
+                    const hist = this._ghostHistory[i + 1];
+                    if (hist) {
+                        ghost.setPosition(hist.x, hist.y);
+                        ghost.setScale(hist.scaleX, hist.scaleY);
+                        ghost.setAlpha(ghost._baseAlpha * (1 - t * 0.7));
+                        ghost.setFrame(this.ball.frame.name);
+                    }
+                });
             },
             onComplete: () => {
                 this.ball.setPosition(targetX, targetY);
+                this.ball.setScale(CFG.ball.endScale);
+                // Ocultar ghosts
+                this.ballGhosts.forEach(g => g.setAlpha(0));
+                this._ghostHistory = [];
                 this.resolveShot(targetX, targetY, band, keeperZone);
             }
         });
 
-        // Escala del balón: se achica progresivamente (efecto de lejanía)
-        this.tweens.add({
-            targets: this.ball,
-            scaleX: CFG.ball.endScale,
-            scaleY: CFG.ball.endScale,
-            duration: CFG.shot.flightDurationMs,
-            ease: 'Sine.easeIn'
-        });
-
-        // Rotación del balón: frameRate proporcional a la potencia
+        // ===== ROTACIÓN CON DESACELERACIÓN =====
         const rot = CFG.ball.rotation;
         const powerT = isWide ? 0.5 : (this.power / 100);
         const ballFrameRate = Math.round(rot.minFrameRate + powerT * (rot.maxFrameRate - rot.minFrameRate));
         this.ball.play({ key: 'ball_roll', frameRate: ballFrameRate, repeat: -1 });
 
-        // Ocultar flecha DOM durante el vuelo
-        if (this.arrowEl) this.arrowEl.classList.add('hidden');
+        // Desacelerar rotación en el último 40% del vuelo
+        this.time.delayedCall(flightMs * 0.6, () => {
+            this.tweens.add({
+                targets: this.ball.anims,
+                timeScale: 0.15,
+                duration: flightMs * 0.4,
+                ease: 'Sine.easeIn'
+            });
+        });
     }
 
     animateKeeperDive(zone) {
@@ -345,8 +425,113 @@ class PenaltyScene extends Phaser.Scene {
         const preShift = CFG.keeper.preShiftX || 0;
         const preShiftMs = CFG.keeper.preShiftDurationMs || 150;
 
+        // Iniciar ghost trail del portero
+        this._keeperGhostHistory = [];
+
+        // Rotación según zona: laterales se inclinan, centro no rota
+        const [row, col] = zone.split('-');
+        let targetAngle = 0;
+        if (col === 'left') targetAngle = row === 'high' ? -35 : -15;
+        else if (col === 'right') targetAngle = row === 'high' ? 35 : 15;
+        const targetRad = Phaser.Math.DegToRad(targetAngle);
+
+        const isHighLateral = row === 'high' && col !== 'center';
+        const diveDur = CFG.keeper.diveDuration;
+
+        const updateGhosts = () => {
+            this._keeperGhostHistory.unshift({
+                x: this.keeper.x,
+                y: this.keeper.y,
+                rotation: this.keeper.rotation,
+                frame: this.keeper.frame.name,
+                texture: this.keeper.texture.key
+            });
+            if (this._keeperGhostHistory.length > 3) this._keeperGhostHistory.pop();
+
+            this.keeperGhosts.forEach((ghost, i) => {
+                const hist = this._keeperGhostHistory[i + 1];
+                if (hist) {
+                    ghost.setPosition(hist.x, hist.y);
+                    ghost.setRotation(hist.rotation);
+                    ghost.setTexture(hist.texture, hist.frame);
+                    ghost.setScale(CFG.keeper.scale);
+                    ghost.setAlpha(ghost._baseAlpha);
+                }
+            });
+        };
+
+        const fadeOutGhosts = () => {
+            this.keeperGhosts.forEach(g => {
+                this.tweens.add({ targets: g, alpha: 0, duration: 150 });
+            });
+            this._keeperGhostHistory = [];
+        };
+
+        const startDive = () => {
+            this.keeper.play(anim);
+            const diveStartX = this.keeper.x;
+            const diveStartY = this.keeper.y;
+
+            if (isHighLateral) {
+                // Fase 1: salto + rotación (sin X)
+                const jumpPct = CFG.keeper.highJumpPct || 0.45;
+                const jumpDur = diveDur * jumpPct;
+                const proxy1 = { t: 0 };
+                this.tweens.add({
+                    targets: proxy1,
+                    t: 1,
+                    duration: jumpDur,
+                    ease: 'Sine.easeOut',
+                    onUpdate: () => {
+                        updateGhosts();
+                        this.keeper.y = diveStartY + (targetY - diveStartY) * proxy1.t;
+                        this.keeper.rotation = targetRad * proxy1.t;
+                    },
+                    onComplete: () => {
+                        // Fase 2: desplazamiento X en el aire
+                        const airStartX = this.keeper.x;
+                        const proxy2 = { t: 0 };
+                        this.tweens.add({
+                            targets: proxy2,
+                            t: 1,
+                            duration: diveDur * (1 - jumpPct),
+                            ease: 'Power2',
+                            onUpdate: () => {
+                                updateGhosts();
+                                this.keeper.x = airStartX + (targetX - airStartX) * proxy2.t;
+                            },
+                            onComplete: () => {
+                                this.keeper.setPosition(targetX, targetY);
+                                this.keeper.rotation = targetRad;
+                                fadeOutGhosts();
+                            }
+                        });
+                    }
+                });
+            } else {
+                // Bajos y centro: movimiento simultáneo (como antes)
+                const proxy = { t: 0 };
+                this.tweens.add({
+                    targets: proxy,
+                    t: 1,
+                    duration: diveDur,
+                    ease: 'Power2',
+                    onUpdate: () => {
+                        updateGhosts();
+                        this.keeper.x = diveStartX + (targetX - diveStartX) * proxy.t;
+                        this.keeper.y = diveStartY + (targetY - diveStartY) * proxy.t;
+                        this.keeper.rotation = targetRad * proxy.t;
+                    },
+                    onComplete: () => {
+                        this.keeper.setPosition(targetX, targetY);
+                        this.keeper.rotation = targetRad;
+                        fadeOutGhosts();
+                    }
+                });
+            }
+        };
+
         if (preShift > 0) {
-            // Paso lateral: se mueve en X hacia la dirección del dive
             const shiftDir = Math.sign(offset.dx) || 0;
             const preX = CFG.keeper.position.x + shiftDir * preShift;
 
@@ -355,36 +540,24 @@ class PenaltyScene extends Phaser.Scene {
                 x: preX,
                 duration: preShiftMs,
                 ease: 'Sine.easeOut',
-                onComplete: () => {
-                    this.keeper.play(anim);
-                    this.tweens.add({
-                        targets: this.keeper,
-                        x: targetX,
-                        y: targetY,
-                        duration: CFG.keeper.diveDuration,
-                        ease: 'Power2'
-                    });
-                }
+                onComplete: startDive
             });
         } else {
-            this.keeper.play(anim);
-            this.tweens.add({
-                targets: this.keeper,
-                x: targetX,
-                y: targetY,
-                duration: CFG.keeper.diveDuration,
-                ease: 'Power2'
-            });
+            startDive();
         }
     }
 
     resolveShot(targetX, targetY, band, keeperZone) {
         const CFG = this.CFG;
-        this.ball.stop();   // detiene la rotación al impacto
+        this.ball.anims.timeScale = 1;
+        this.ball.stop();
 
-        const outcome = this.determineOutcome(targetX, targetY, band, keeperZone);
+        const outcome = this.determineOutcome(targetX, targetY, band);
 
-        if (outcome === 'goal') this.score += 1;
+        if (outcome === 'goal') {
+            this.score += 1;
+            this.spawnGoalParticles(targetX, targetY);
+        }
         this.updateScoreDOM();
         this.showFeedbackDOM(CFG.messages[outcome], outcome);
 
@@ -392,42 +565,60 @@ class PenaltyScene extends Phaser.Scene {
         this.time.delayedCall(900, () => this.nextShot());
     }
 
-    determineOutcome(x, y, band, keeperZone) {
+    spawnGoalParticles(x, y) {
+        const colors = [0x00ff88, 0xe6ff00, 0xff4444, 0x44aaff, 0xffffff, 0xff9900];
+        const count = 24;
+
+        for (let i = 0; i < count; i++) {
+            const color = Phaser.Utils.Array.GetRandom(colors);
+            const size = Phaser.Math.Between(3, 7);
+            const particle = this.add.rectangle(x, y, size, size, color)
+                .setDepth(10)
+                .setAlpha(1);
+
+            // Dirección aleatoria en abanico hacia abajo (simula caída de confetti)
+            const angle = Phaser.Math.FloatBetween(-Math.PI * 0.8, -Math.PI * 0.2);
+            const speed = Phaser.Math.Between(80, 220);
+            const endX = x + Math.cos(angle) * speed;
+            const endY = y + Math.sin(angle) * speed;
+            const drift = Phaser.Math.FloatBetween(-30, 30);
+
+            // Vuelo + caída con gravedad simulada
+            this.tweens.add({
+                targets: particle,
+                x: endX + drift,
+                y: endY + Phaser.Math.Between(60, 140),
+                rotation: Phaser.Math.FloatBetween(-4, 4),
+                scaleX: { from: 1, to: Phaser.Math.FloatBetween(0.3, 0.8) },
+                scaleY: { from: 1, to: Phaser.Math.FloatBetween(0.2, 0.5) },
+                alpha: { from: 1, to: 0 },
+                duration: Phaser.Math.Between(600, 1000),
+                ease: 'Quad.easeOut',
+                onComplete: () => particle.destroy()
+            });
+        }
+    }
+
+    determineOutcome(x, y, band) {
         const CFG = this.CFG;
 
-        // Validación del arco: el balón debe caer DENTRO del rectángulo del arco
-        // (horizontal: mouthLeft..mouthRight, vertical: crossbarY..groundY).
-        // Tolerancia de 8px en los bordes para que un tiro al palo cuente como adentro.
+        // Fuera del arco → miss
         const tol = 8;
         const outsideX = x < CFG.goal.mouthLeft - tol || x > CFG.goal.mouthRight + tol;
         const outsideY = y < CFG.goal.crossbarY - tol || y > CFG.goal.groundY + tol;
         if (band === 'wide' || band === 'over' || outsideX || outsideY) return 'miss';
 
-        // Atajada: sólo si el arquero eligió la MISMA fila (high/low) que el balón
-        // Y además: misma columna exacta, o columna adyacente + arquero físicamente cerca
-        const ballZone = this.ballZone(x, y);
-        const [kRow, kCol] = keeperZone.split('-');
-        const [bRow, bCol] = ballZone.split('-');
+        // Atajada basada en distancia real entre portero y balón
+        const kx = this.keeper.x;
+        const ky = this.keeper.y - (this.keeper.displayHeight * 0.4); // centro visual del sprite
+        const dx = Math.abs(x - kx);
+        const dy = Math.abs(y - ky);
+        const saveRX = CFG.shot.saveRadiusX || 35;
+        const saveRY = CFG.shot.saveRadiusY || 30;
 
-        // Si el arquero está en la fila equivocada (ej: eligió low y el balón fue high)
-        // NO puede atajar, incluso si la X coincide.
-        if (kRow !== bRow) return 'goal';
-
-        // Misma fila + misma columna → save seguro
-        if (kCol === bCol) return 'save';
-
-        // Misma fila + columna adyacente: save sólo si el arquero quedó cerca en X
-        if (this.columnsAdjacent(kCol, bCol)) {
-            const kx = CFG.keeper.position.x + CFG.keeper.zoneOffsets[keeperZone].dx;
-            if (Math.abs(x - kx) < CFG.shot.saveRadiusX) return 'save';
-        }
+        if (dx < saveRX && dy < saveRY) return 'save';
 
         return 'goal';
-    }
-
-    columnsAdjacent(a, b) {
-        const order = { left: 0, center: 1, right: 2 };
-        return Math.abs(order[a] - order[b]) === 1;
     }
 
     showFeedbackDOM(msg, outcome) {
@@ -461,11 +652,35 @@ class PenaltyScene extends Phaser.Scene {
                 this.ball.setPosition(CFG.ball.startPos.x, CFG.ball.startPos.y)
                     .setScale(CFG.ball.startScale)
                     .setFrame(0);
+                this.ball.anims.timeScale = 1;
+                // Resetear ghosts
+                this.ballGhosts.forEach(g => {
+                    g.setPosition(CFG.ball.startPos.x, CFG.ball.startPos.y);
+                    g.setAlpha(0);
+                    g.setScale(CFG.ball.startScale);
+                });
+                this._ghostHistory = [];
 
-                // Arquero vuelve a idle y a su posición central
-                this.keeper.setPosition(CFG.keeper.position.x, CFG.keeper.position.y);
-                this.keeper.play('keeper_idle');
+                // Arquero: fade out → reposicionar al centro → fade in
+                this.keeperGhosts.forEach(g => g.setAlpha(0));
+                this._keeperGhostHistory = [];
                 this.keeperZone = null;
+
+                this.tweens.add({
+                    targets: this.keeper,
+                    alpha: 0,
+                    duration: 200,
+                    onComplete: () => {
+                        this.keeper.setPosition(CFG.keeper.position.x, CFG.keeper.position.y);
+                        this.keeper.setRotation(0);
+                        this.keeper.play('keeper_idle');
+                        this.tweens.add({
+                            targets: this.keeper,
+                            alpha: 1,
+                            duration: 200
+                        });
+                    }
+                });
 
                 this.power = 0;
                 this.redrawPowerBar(0);

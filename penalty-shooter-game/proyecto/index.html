@@ -53,12 +53,12 @@
 
         // Offsets al tirarse a cada zona, relativos a position:
         zoneOffsets: {
-          'high-left': { dx: -40, dy: 0 },
-          'high-center': { dx: 0, dy: 0 },
-          'high-right': { dx: 40, dy: 0 },
-          'low-left': { dx: -40, dy: 0 },
+          'high-left': { dx: -25, dy: -20 },
+          'high-center': { dx: 0, dy: -12 },
+          'high-right': { dx: 25, dy: -20 },
+          'low-left': { dx: -50, dy: 0 },
           'low-center': { dx: 0, dy: 0 },
-          'low-right': { dx: 40, dy: 0 }
+          'low-right': { dx: 50, dy: 0 }
         },
         // Mapeo zona → clave de animación (debe coincidir con claves en spritesheets)
         zoneAnim: {
@@ -69,12 +69,14 @@
           'low-center': 'gk_save_center_down',
           'low-right': 'gk_save_down_right'
         },
-        diveDuration: 300,
-        preShiftX: 0,             // px de paso lateral previo al dive (0 = sin pre-movimiento)
-        preShiftDurationMs: 0,   // duración del paso lateral
+        diveDuration: 200,         // ms que tarda el portero en tirarse (↓ = más rápido)
+        highJumpPct: 0.45,         // % del dive que dedica a saltar antes de moverse en X (altos laterales)
+        preShiftX: 0,              // px de paso lateral previo al dive (0 = sin pre-movimiento)
+        preShiftDurationMs: 0,     // duración del paso lateral
+        returnDuration: 400,       // ms que tarda en volver al centro después de un tiro
         idleFrameRate: 6,
         diveFrameRate: 30,
-        diveTimingPct: 0.5,
+        diveTimingPct: 0.05,       // 0 = reacciona inmediatamente, 0.5 = espera mitad del vuelo
         aiBias: 0.45      // probabilidad de leer correctamente la zona del balón
       },
 
@@ -97,8 +99,8 @@
           maxFrameRate: 30    // potencia máxima → gira rápido
         },
 
-        // Timing del vuelo: Expo.easeOut = arranca muy rápido y desacelera bruscamente
-        // Opciones más suaves: 'Quint.easeOut', 'Quart.easeOut', 'Cubic.easeOut'
+        // Timing del vuelo: Back.easeOut = arranca explosivo con ligero overshoot
+        // Alternativas: 'Expo.easeOut' (sin overshoot), 'Quint.easeOut' (más suave)
         flightEase: 'Expo.easeOut'
       },
 
@@ -123,7 +125,7 @@
       // Mecánica del disparo
       shot: {
         totalShots: 5,
-        flightDurationMs: 700,
+        flightDurationMs: 550,     // ms que tarda el balón en llegar al arco (↓ = más rápido)
         // Bandas de potencia (%) → altura del tiro
         heightBands: { lowMax: 25, midMax: 55, highMax: 92, overMax: 100 },
         // Y de llegada del balón por banda (dentro del arco: crossbarY=285..groundY=395).
@@ -134,9 +136,10 @@
         landingY: { low: 340, mid: 310, high: 280, over: 250 },
         // Umbral Y que separa filas "low" vs "high" del arquero
         highLowThresholdY: 340,
-        saveRadiusX: 32,
+        saveRadiusX: 35,            // distancia en X para que el portero ataje
+        saveRadiusY: 35,            // distancia en Y para que el portero ataje
         directionSpreadX: 140,      // permite que los tiros lleguen a las esquinas del arco
-        wideAngleThresholdDeg: 37   // ángulos más allá de ±37° → fuera automático
+        wideAngleThresholdDeg: 42   // ángulos más allá de ±37° → fuera automático
       },
 
       // Botón PATEAR: ahora está en el DOM (#kick-btn). Config sólo guarda label y selector.
