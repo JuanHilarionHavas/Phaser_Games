@@ -4,48 +4,65 @@ class PenaltyScene extends Phaser.Scene {
         const CFG = window.GAME_CONFIG;
         const base = CFG.assetsBase;
 
-        this.load.image('bg',     base + CFG.background.image);
-        this.load.image('ball',   base + CFG.ball.image);
+        this.load.image('bg', base + CFG.background.image);
         this.load.image('shadow', base + CFG.ball.shadow);
 
-        // Arquero: idle + 6 zonas de clavada
-        for (let i = 0; i < CFG.keeper.idleFrames; i++) {
-            this.load.image('gk_idle_' + i, base + 'gk_idle/' + i + '.png');
-        }
-        Object.values(CFG.keeper.zoneAnim).forEach(animKey => {
-            for (let i = 0; i < CFG.keeper.diveFrames; i++) {
-                this.load.image(animKey + '_' + i, base + animKey + '/' + i + '.png');
-            }
+        // Balón como spritesheet para animación de rotación
+        const bs = CFG.ball.spritesheet;
+        this.load.spritesheet('ball', base + CFG.ball.image, {
+            frameWidth:  bs.frameWidth,
+            frameHeight: bs.frameHeight
+        });
+
+        // Arquero: spritesheets (un archivo por animación)
+        const ss = CFG.keeper.spritesheets;
+        Object.keys(ss).forEach(key => {
+            const s = ss[key];
+            this.load.spritesheet(key, base + s.file, {
+                frameWidth:  s.frameWidth,
+                frameHeight: s.frameHeight
+            });
         });
     }
 
     buildKeeperAnims() {
         const CFG = this.CFG;
-        const idleFrames = [];
-        for (let i = 0; i < CFG.keeper.idleFrames; i++) {
-            idleFrames.push({ key: 'gk_idle_' + i });
-        }
+        const ss = CFG.keeper.spritesheets;
+
         if (!this.anims.exists('keeper_idle')) {
             this.anims.create({
                 key: 'keeper_idle',
-                frames: idleFrames,
+                frames: this.anims.generateFrameNumbers('idle', {
+                    start: 0, end: ss.idle.frameCount - 1
+                }),
                 frameRate: CFG.keeper.idleFrameRate,
                 repeat: -1
             });
         }
+
         Object.values(CFG.keeper.zoneAnim).forEach(animKey => {
             if (this.anims.exists(animKey)) return;
-            const diveFrames = [];
-            for (let i = 0; i < CFG.keeper.diveFrames; i++) {
-                diveFrames.push({ key: animKey + '_' + i });
-            }
             this.anims.create({
                 key: animKey,
-                frames: diveFrames,
+                frames: this.anims.generateFrameNumbers(animKey, {
+                    start: 0, end: ss[animKey].frameCount - 1
+                }),
                 frameRate: CFG.keeper.diveFrameRate,
                 repeat: 0
             });
         });
+    }
+
+    buildBallAnim() {
+        const bs = this.CFG.ball.spritesheet;
+        if (!this.anims.exists('ball_roll')) {
+            this.anims.create({
+                key: 'ball_roll',
+                frames: this.anims.generateFrameNumbers('ball', { start: 0, end: bs.frameCount - 1 }),
+                frameRate: this.CFG.ball.rotation.minFrameRate,
+                repeat: -1
+            });
+        }
     }
 
     create() {
@@ -53,6 +70,7 @@ class PenaltyScene extends Phaser.Scene {
         this.CFG = CFG;
 
         this.buildKeeperAnims();
+        this.buildBallAnim();
 
         // ----- Fondo: asset 300x600 único (arco + estadio + pasto con perspectiva) -----
         const bg = CFG.background;
@@ -62,7 +80,7 @@ class PenaltyScene extends Phaser.Scene {
             .setDepth(0);
 
         // ----- Arquero -----
-        this.keeper = this.add.sprite(CFG.keeper.position.x, CFG.keeper.position.y, 'gk_idle_0')
+        this.keeper = this.add.sprite(CFG.keeper.position.x, CFG.keeper.position.y, 'idle', 0)
             .setOrigin(0.5, 1)
             .setScale(CFG.keeper.scale)
             .setDepth(2);
@@ -78,7 +96,7 @@ class PenaltyScene extends Phaser.Scene {
             .setAlpha(0.55)
             .setDepth(3);
 
-        this.ball = this.add.image(CFG.ball.startPos.x, CFG.ball.startPos.y, 'ball')
+        this.ball = this.add.sprite(CFG.ball.startPos.x, CFG.ball.startPos.y, 'ball', 0)
             .setOrigin(0.5, 0.5)
             .setScale(CFG.ball.startScale)
             .setDepth(4);
@@ -99,10 +117,10 @@ class PenaltyScene extends Phaser.Scene {
         this.redrawPowerBar(0);
 
         // ----- DOM refs (botón PATEAR + feedback + UI) -----
-        this.feedbackEl    = document.querySelector(CFG.ui.feedbackSelector);
+        this.feedbackEl = document.querySelector(CFG.ui.feedbackSelector);
         this.shotCounterEl = document.querySelector(CFG.ui.shotCounterSelector);
-        this.scoreEl       = document.querySelector(CFG.ui.scoreSelector);
-        this.kickBtnEl     = document.querySelector(CFG.ui.kickBtnSelector);
+        this.scoreEl = document.querySelector(CFG.ui.scoreSelector);
+        this.kickBtnEl = document.querySelector(CFG.ui.kickBtnSelector);
 
         // ----- Input del botón PATEAR (DOM) -----
         if (this.kickBtnEl) {
@@ -111,22 +129,22 @@ class PenaltyScene extends Phaser.Scene {
             // sobrevivir entre scene.restart(), así que guardamos los handlers para
             // removerlos en shutdown.
             this._kickHandlers = {
-                down:   () => this.onPress(),
-                up:     () => this.onRelease(),
-                leave:  () => this.onRelease(),
+                down: () => this.onPress(),
+                up: () => this.onRelease(),
+                leave: () => this.onRelease(),
                 cancel: () => this.onRelease()
             };
-            this.kickBtnEl.addEventListener('pointerdown',   this._kickHandlers.down);
-            this.kickBtnEl.addEventListener('pointerup',     this._kickHandlers.up);
-            this.kickBtnEl.addEventListener('pointerleave',  this._kickHandlers.leave);
+            this.kickBtnEl.addEventListener('pointerdown', this._kickHandlers.down);
+            this.kickBtnEl.addEventListener('pointerup', this._kickHandlers.up);
+            this.kickBtnEl.addEventListener('pointerleave', this._kickHandlers.leave);
             this.kickBtnEl.addEventListener('pointercancel', this._kickHandlers.cancel);
             this.kickBtnEl.disabled = false;
         }
         this.events.on('shutdown', () => {
             if (this.kickBtnEl && this._kickHandlers) {
-                this.kickBtnEl.removeEventListener('pointerdown',   this._kickHandlers.down);
-                this.kickBtnEl.removeEventListener('pointerup',     this._kickHandlers.up);
-                this.kickBtnEl.removeEventListener('pointerleave',  this._kickHandlers.leave);
+                this.kickBtnEl.removeEventListener('pointerdown', this._kickHandlers.down);
+                this.kickBtnEl.removeEventListener('pointerup', this._kickHandlers.up);
+                this.kickBtnEl.removeEventListener('pointerleave', this._kickHandlers.leave);
                 this.kickBtnEl.removeEventListener('pointercancel', this._kickHandlers.cancel);
             }
         });
@@ -197,9 +215,9 @@ class PenaltyScene extends Phaser.Scene {
         const bands = this.CFG.shot.heightBands;
         const fillH = (power / 100) * pb.h;
         let color = pb.fillLowColor;
-        if (power > bands.highMax)      color = pb.fillOverColor;
-        else if (power > bands.midMax)  color = pb.fillHighColor;
-        else if (power > bands.lowMax)  color = pb.fillMidColor;
+        if (power > bands.highMax) color = pb.fillOverColor;
+        else if (power > bands.midMax) color = pb.fillHighColor;
+        else if (power > bands.lowMax) color = pb.fillMidColor;
 
         const innerW = pb.w - 4;
         const topY = pb.y + pb.h - fillH;
@@ -216,9 +234,9 @@ class PenaltyScene extends Phaser.Scene {
         const CFG = this.CFG;
         const W = CFG.goal.mouthRight - CFG.goal.mouthLeft;
         let col;
-        if (x < CFG.goal.mouthLeft + W / 3)        col = 'left';
-        else if (x > CFG.goal.mouthRight - W / 3)  col = 'right';
-        else                                       col = 'center';
+        if (x < CFG.goal.mouthLeft + W / 3) col = 'left';
+        else if (x > CFG.goal.mouthRight - W / 3) col = 'right';
+        else col = 'center';
         const row = (y < CFG.shot.highLowThresholdY) ? 'high' : 'low';
         return row + '-' + col;
     }
@@ -245,11 +263,11 @@ class PenaltyScene extends Phaser.Scene {
         const bands = CFG.shot.heightBands;
         const land = CFG.shot.landingY;
         let band, targetY;
-        if (isWide)                           { band = 'wide'; targetY = land.mid; }
-        else if (this.power <= bands.lowMax)  { band = 'low';  targetY = land.low; }
-        else if (this.power <= bands.midMax)  { band = 'mid';  targetY = land.mid; }
+        if (isWide) { band = 'wide'; targetY = land.mid; }
+        else if (this.power <= bands.lowMax) { band = 'low'; targetY = land.low; }
+        else if (this.power <= bands.midMax) { band = 'mid'; targetY = land.mid; }
         else if (this.power <= bands.highMax) { band = 'high'; targetY = land.high; }
-        else                                  { band = 'over'; targetY = land.over; }
+        else { band = 'over'; targetY = land.over; }
 
         // Zona del balón (salvo que vaya fuera del arco/por encima del travesaño)
         const realBallZone = this.ballZone(targetX, targetY);
@@ -303,6 +321,12 @@ class PenaltyScene extends Phaser.Scene {
             ease: 'Sine.easeIn'
         });
 
+        // Rotación del balón: frameRate proporcional a la potencia
+        const rot = CFG.ball.rotation;
+        const powerT = isWide ? 0.5 : (this.power / 100);
+        const ballFrameRate = Math.round(rot.minFrameRate + powerT * (rot.maxFrameRate - rot.minFrameRate));
+        this.ball.play({ key: 'ball_roll', frameRate: ballFrameRate, repeat: -1 });
+
         // Ocultar flecha DOM durante el vuelo
         if (this.arrowEl) this.arrowEl.classList.add('hidden');
     }
@@ -328,6 +352,8 @@ class PenaltyScene extends Phaser.Scene {
 
     resolveShot(targetX, targetY, band, keeperZone) {
         const CFG = this.CFG;
+        this.ball.stop();   // detiene la rotación al impacto
+
         const outcome = this.determineOutcome(targetX, targetY, band, keeperZone);
 
         if (outcome === 'goal') this.score += 1;
@@ -405,7 +431,8 @@ class PenaltyScene extends Phaser.Scene {
             duration: 200,
             onComplete: () => {
                 this.ball.setPosition(CFG.ball.startPos.x, CFG.ball.startPos.y)
-                    .setScale(CFG.ball.startScale);
+                    .setScale(CFG.ball.startScale)
+                    .setFrame(0);
                 this.ballShadow.setPosition(CFG.ball.startPos.x, CFG.ball.startPos.y + CFG.ball.shadowYOffset)
                     .setScale(CFG.ball.shadowScale);
 
@@ -424,7 +451,7 @@ class PenaltyScene extends Phaser.Scene {
                     this.arrowEl.classList.remove('hidden');
                 }
 
-                this.tweens.add({ targets: this.ball,       alpha: 1,    duration: 200 });
+                this.tweens.add({ targets: this.ball, alpha: 1, duration: 200 });
                 this.tweens.add({ targets: this.ballShadow, alpha: 0.55, duration: 200 });
 
                 this.updateShotCounterDOM();

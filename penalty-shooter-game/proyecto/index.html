@@ -33,10 +33,23 @@
     // Arquero: chiquito, justo debajo del travesaño dentro del arco.
     // 6 zonas de atajada (3 columnas × 2 filas).
     keeper: {
-      idleFrames: 6,
-      diveFrames: 15,
       position: { x: 150, y: 355 },   // pies en la línea de gol
       scale: 0.3,                     // más pequeño para reforzar profundidad
+
+      // Spritesheets del arquero: cada clave coincide con la animación en zoneAnim.
+      // frameWidth/frameHeight = tamaño de cada frame dentro del strip.
+      // frameCount = cantidad real de frames (Phaser los detecta automáticamente,
+      //              pero se declara aquí para que sea fácilmente tuneable).
+      spritesheets: {
+        idle:                { file: 'gk_idle/Idle.png',                    frameWidth: 285, frameHeight: 386, frameCount: 7  },
+        gk_save_up_left:     { file: 'gk_save_up_left/Up_Left.png',         frameWidth: 284, frameHeight: 386, frameCount: 15 },
+        gk_save_up_right:    { file: 'gk_save_up_right/Up_Right.png',       frameWidth: 284, frameHeight: 386, frameCount: 15 },
+        gk_save_center_up:   { file: 'gk_save_center_up/Center_Up.png',     frameWidth: 284, frameHeight: 386, frameCount: 15 },
+        gk_save_down_left:   { file: 'gk_save_down_left/Down_Left.png',     frameWidth: 285, frameHeight: 386, frameCount: 14 },
+        gk_save_down_right:  { file: 'gk_save_down_right/Down_Right.png',   frameWidth: 285, frameHeight: 386, frameCount: 14 },
+        gk_save_center_down: { file: 'gk_save_center_down/Center_Down.png', frameWidth: 284, frameHeight: 386, frameCount: 15 }
+      },
+
       // Offsets al tirarse a cada zona, relativos a position:
       zoneOffsets: {
         'high-left':   { dx: -70, dy: -12 },
@@ -46,7 +59,7 @@
         'low-center':  { dx:   0, dy:   0 },
         'low-right':   { dx:  60, dy:   0 }
       },
-      // Mapeo zona → clave de animación
+      // Mapeo zona → clave de animación (debe coincidir con claves en spritesheets)
       zoneAnim: {
         'high-left':   'gk_save_up_left',
         'high-center': 'gk_save_center_up',
@@ -70,7 +83,19 @@
       startScale: 0.35,                // un poco más grande para reforzar cercanía
       endScale: 0.08,                 // muy pequeño al llegar al arco (efecto lejanía)
       shadowYOffset: 20,
-      shadowScale: 0.28
+      shadowScale: 0.28,
+
+      // Spritesheet de rotación del balón
+      spritesheet: {
+        frameWidth:  172,   // cada frame es 172×174px (2px de gap lateral)
+        frameHeight: 174,
+        frameCount:  12
+      },
+      // Velocidad de giro según potencia (0–100)
+      rotation: {
+        minFrameRate:  6,   // potencia baja  → gira suave
+        maxFrameRate: 30    // potencia máxima → gira rápido
+      }
     },
 
     // Flecha de dirección: arriba del balón apuntando al arco
