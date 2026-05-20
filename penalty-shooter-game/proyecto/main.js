@@ -5,7 +5,6 @@ class PenaltyScene extends Phaser.Scene {
         const base = CFG.assetsBase;
 
         this.load.image('bg', base + CFG.background.image);
-        this.load.image('shadow', base + CFG.ball.shadow);
 
         // Balón como spritesheet para animación de rotación
         const bs = CFG.ball.spritesheet;
@@ -86,16 +85,7 @@ class PenaltyScene extends Phaser.Scene {
             .setDepth(2);
         this.keeper.play('keeper_idle');
 
-        // ----- Sombra + balón -----
-        this.ballShadow = this.add.image(
-            CFG.ball.startPos.x,
-            CFG.ball.startPos.y + CFG.ball.shadowYOffset,
-            'shadow'
-        )
-            .setScale(CFG.ball.shadowScale)
-            .setAlpha(0.55)
-            .setDepth(3);
-
+        // ----- Balón -----
         this.ball = this.add.sprite(CFG.ball.startPos.x, CFG.ball.startPos.y, 'ball', 0)
             .setOrigin(0.5, 0.5)
             .setScale(CFG.ball.startScale)
@@ -108,11 +98,7 @@ class PenaltyScene extends Phaser.Scene {
             this.arrowEl.style.transform = 'rotate(0deg)';
         }
 
-        // ----- Barra de potencia -----
-        const pb = CFG.powerBar;
-        this.powerBarBg = this.add.rectangle(pb.x, pb.y + pb.h / 2, pb.w, pb.h, pb.bgColor)
-            .setStrokeStyle(1, pb.borderColor)
-            .setDepth(6);
+        // ----- Barra de potencia (segmentada) -----
         this.powerBarFill = this.add.graphics().setDepth(7);
         this.redrawPowerBar(0);
 
@@ -210,22 +196,47 @@ class PenaltyScene extends Phaser.Scene {
         this.executeShot();
     }
 
+    segmentColor(i, total) {
+        // Degradado: verde → amarillo → naranja → rojo
+        const t = i / (total - 1);
+        let r, g, b;
+        if (t < 0.5) {
+            // verde (0,204,0) → amarillo (255,220,0)
+            const p = t / 0.5;
+            r = Math.round(p * 255);
+            g = Math.round(204 + p * 16);
+            b = 0;
+        } else {
+            // amarillo (255,220,0) → rojo (255,20,0)
+            const p = (t - 0.5) / 0.5;
+            r = 255;
+            g = Math.round(220 - p * 200);
+            b = 0;
+        }
+        return (r << 16) | (g << 8) | b;
+    }
+
     redrawPowerBar(power) {
         const pb = this.CFG.powerBar;
-        const bands = this.CFG.shot.heightBands;
-        const fillH = (power / 100) * pb.h;
-        let color = pb.fillLowColor;
-        if (power > bands.highMax) color = pb.fillOverColor;
-        else if (power > bands.midMax) color = pb.fillHighColor;
-        else if (power > bands.lowMax) color = pb.fillMidColor;
-
-        const innerW = pb.w - 4;
-        const topY = pb.y + pb.h - fillH;
+        const total = pb.segments || 20;
+        const gap = pb.segmentGap || 2;
+        const segH = (pb.h - gap * (total - 1)) / total;
+        const innerW = pb.w - 2;
         const leftX = pb.x - innerW / 2;
+        const filledCount = Math.floor((power / 100) * total);
+
         this.powerBarFill.clear();
-        if (fillH > 0) {
-            this.powerBarFill.fillStyle(color, 1);
-            this.powerBarFill.fillRect(leftX, topY, innerW, fillH);
+        for (let i = 0; i < total; i++) {
+            // i=0 es el segmento de arriba (mayor potencia), i=total-1 es el de abajo
+            const segY = pb.y + i * (segH + gap);
+            const segIndex = total - 1 - i; // invertir para que color verde esté abajo
+
+            if (segIndex < filledCount) {
+                this.powerBarFill.fillStyle(this.segmentColor(segIndex, total), 1);
+            } else {
+                this.powerBarFill.fillStyle(pb.bgColor, 0.6);
+            }
+            this.powerBarFill.fillRect(leftX, segY, innerW, segH);
         }
     }
 
@@ -285,38 +296,32 @@ class PenaltyScene extends Phaser.Scene {
             this.animateKeeperDive(keeperZone);
         });
 
-        // Tween del balón: x/y con easeOut (llega rápido y desacelera),
-        // escala con easeIn (se achica más al final → efecto de lejanía acentuado)
+        // Vuelo del balón: arranque muy rápido → desaceleración brusca (Expo.easeOut)
+        const startX = this.ball.x;
+        const startY = this.ball.y;
+
+        const proxy = { t: 0 };
         this.tweens.add({
-            targets: this.ball,
-            x: targetX,
-            y: targetY,
+            targets: proxy,
+            t: 1,
             duration: CFG.shot.flightDurationMs,
-            ease: 'Cubic.easeOut',
-            onComplete: () => this.resolveShot(targetX, targetY, band, keeperZone)
+            ease: CFG.ball.flightEase,
+            onUpdate: () => {
+                const t = proxy.t;
+                this.ball.x = startX + (targetX - startX) * t;
+                this.ball.y = startY + (targetY - startY) * t;
+            },
+            onComplete: () => {
+                this.ball.setPosition(targetX, targetY);
+                this.resolveShot(targetX, targetY, band, keeperZone);
+            }
         });
+
+        // Escala del balón: se achica progresivamente (efecto de lejanía)
         this.tweens.add({
             targets: this.ball,
             scaleX: CFG.ball.endScale,
             scaleY: CFG.ball.endScale,
-            duration: CFG.shot.flightDurationMs,
-            ease: 'Sine.easeIn'
-        });
-
-        // Sombra: queda en el piso, se achica y se desvanece progresivamente
-        const shadowGroundY = CFG.ball.startPos.y + CFG.ball.shadowYOffset;
-        this.tweens.add({
-            targets: this.ballShadow,
-            x: targetX,
-            y: shadowGroundY,
-            duration: CFG.shot.flightDurationMs,
-            ease: 'Cubic.easeOut'
-        });
-        this.tweens.add({
-            targets: this.ballShadow,
-            scaleX: CFG.ball.endScale * 0.55,
-            scaleY: CFG.ball.endScale * 0.55,
-            alpha: 0.15,
             duration: CFG.shot.flightDurationMs,
             ease: 'Sine.easeIn'
         });
@@ -334,20 +339,43 @@ class PenaltyScene extends Phaser.Scene {
     animateKeeperDive(zone) {
         const CFG = this.CFG;
         const anim = CFG.keeper.zoneAnim[zone];
-        const off = CFG.keeper.zoneOffsets[zone];
-        const targetX = CFG.keeper.position.x + off.dx;
-        const targetY = CFG.keeper.position.y + off.dy;
-        this.keeperFinalX = targetX;
-        this.keeperFinalY = targetY;
+        const offset = CFG.keeper.zoneOffsets[zone];
+        const targetX = CFG.keeper.position.x + offset.dx;
+        const targetY = CFG.keeper.position.y + offset.dy;
+        const preShift = CFG.keeper.preShiftX || 0;
+        const preShiftMs = CFG.keeper.preShiftDurationMs || 150;
 
-        this.keeper.play(anim);
-        this.tweens.add({
-            targets: this.keeper,
-            x: targetX,
-            y: targetY,
-            duration: CFG.keeper.diveDuration,
-            ease: 'Cubic.easeOut'
-        });
+        if (preShift > 0) {
+            // Paso lateral: se mueve en X hacia la dirección del dive
+            const shiftDir = Math.sign(offset.dx) || 0;
+            const preX = CFG.keeper.position.x + shiftDir * preShift;
+
+            this.tweens.add({
+                targets: this.keeper,
+                x: preX,
+                duration: preShiftMs,
+                ease: 'Sine.easeOut',
+                onComplete: () => {
+                    this.keeper.play(anim);
+                    this.tweens.add({
+                        targets: this.keeper,
+                        x: targetX,
+                        y: targetY,
+                        duration: CFG.keeper.diveDuration,
+                        ease: 'Power2'
+                    });
+                }
+            });
+        } else {
+            this.keeper.play(anim);
+            this.tweens.add({
+                targets: this.keeper,
+                x: targetX,
+                y: targetY,
+                duration: CFG.keeper.diveDuration,
+                ease: 'Power2'
+            });
+        }
     }
 
     resolveShot(targetX, targetY, band, keeperZone) {
@@ -426,21 +454,17 @@ class PenaltyScene extends Phaser.Scene {
         this.state = 'RESETTING';
 
         this.tweens.add({
-            targets: [this.ball, this.ballShadow],
+            targets: this.ball,
             alpha: 0,
             duration: 200,
             onComplete: () => {
                 this.ball.setPosition(CFG.ball.startPos.x, CFG.ball.startPos.y)
                     .setScale(CFG.ball.startScale)
                     .setFrame(0);
-                this.ballShadow.setPosition(CFG.ball.startPos.x, CFG.ball.startPos.y + CFG.ball.shadowYOffset)
-                    .setScale(CFG.ball.shadowScale);
 
-                // Arquero vuelve a idle en su posición original
+                // Arquero vuelve a idle y a su posición central
                 this.keeper.setPosition(CFG.keeper.position.x, CFG.keeper.position.y);
                 this.keeper.play('keeper_idle');
-                this.keeperFinalX = CFG.keeper.position.x;
-                this.keeperFinalY = CFG.keeper.position.y;
                 this.keeperZone = null;
 
                 this.power = 0;
@@ -452,7 +476,6 @@ class PenaltyScene extends Phaser.Scene {
                 }
 
                 this.tweens.add({ targets: this.ball, alpha: 1, duration: 200 });
-                this.tweens.add({ targets: this.ballShadow, alpha: 0.55, duration: 200 });
 
                 this.updateShotCounterDOM();
 

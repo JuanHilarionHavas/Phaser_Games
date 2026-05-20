@@ -1,172 +1,176 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Penalty Shooter - Drive Them Crazy</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
   <script>
-  window.GAME_CONFIG = {
-    assetsBase: "assets/images/",
+    window.GAME_CONFIG = {
+      assetsBase: "assets/images/",
 
-    // Fondo: imagen exacta 300x600. Se dibuja tal cual, sin escalado ni crops.
-    background: {
-      image: "bg_field.png",
-      size: { width: 300, height: 600 },
-      displayWidth: 300,
-      displayHeight: 600,
-      displayX: 150,
-      displayY: 300,
-      originX: 0.5, originY: 0.5
-    },
-
-    // Arco lógico: coordenadas donde el balón "entra" al arco en el canvas.
-    // Medido sobre el asset bg_field.png (300x600): travesaño ~y=283, línea de
-    // gol ~y=395, postes ~x=50..250.
-    goal: {
-      mouthLeft: 55,
-      mouthRight: 245,
-      crossbarY: 285,    // travesaño (Y mínima donde un tiro pasa por arriba)
-      groundY: 395       // línea de gol (Y de aterrizaje de tiros rasantes)
-    },
-
-    // Arquero: chiquito, justo debajo del travesaño dentro del arco.
-    // 6 zonas de atajada (3 columnas × 2 filas).
-    keeper: {
-      position: { x: 150, y: 355 },   // pies en la línea de gol
-      scale: 0.3,                     // más pequeño para reforzar profundidad
-
-      // Spritesheets del arquero: cada clave coincide con la animación en zoneAnim.
-      // frameWidth/frameHeight = tamaño de cada frame dentro del strip.
-      // frameCount = cantidad real de frames (Phaser los detecta automáticamente,
-      //              pero se declara aquí para que sea fácilmente tuneable).
-      spritesheets: {
-        idle:                { file: 'gk_idle/Idle.png',                    frameWidth: 285, frameHeight: 386, frameCount: 7  },
-        gk_save_up_left:     { file: 'gk_save_up_left/Up_Left.png',         frameWidth: 284, frameHeight: 386, frameCount: 15 },
-        gk_save_up_right:    { file: 'gk_save_up_right/Up_Right.png',       frameWidth: 284, frameHeight: 386, frameCount: 15 },
-        gk_save_center_up:   { file: 'gk_save_center_up/Center_Up.png',     frameWidth: 284, frameHeight: 386, frameCount: 15 },
-        gk_save_down_left:   { file: 'gk_save_down_left/Down_Left.png',     frameWidth: 285, frameHeight: 386, frameCount: 14 },
-        gk_save_down_right:  { file: 'gk_save_down_right/Down_Right.png',   frameWidth: 285, frameHeight: 386, frameCount: 14 },
-        gk_save_center_down: { file: 'gk_save_center_down/Center_Down.png', frameWidth: 284, frameHeight: 386, frameCount: 15 }
+      // Fondo: imagen exacta 300x600. Se dibuja tal cual, sin escalado ni crops.
+      background: {
+        image: "bg_field.png",
+        size: { width: 300, height: 600 },
+        displayWidth: 300,
+        displayHeight: 600,
+        displayX: 150,
+        displayY: 300,
+        originX: 0.5, originY: 0.5
       },
 
-      // Offsets al tirarse a cada zona, relativos a position:
-      zoneOffsets: {
-        'high-left':   { dx: -70, dy: -12 },
-        'high-center': { dx:   0, dy: -10 },
-        'high-right':  { dx:  70, dy: -12 },
-        'low-left':    { dx: -60, dy:   0 },
-        'low-center':  { dx:   0, dy:   0 },
-        'low-right':   { dx:  60, dy:   0 }
+      // Arco lógico: coordenadas donde el balón "entra" al arco en el canvas.
+      // Medido sobre el asset bg_field.png (300x600): travesaño ~y=283, línea de
+      // gol ~y=395, postes ~x=50..250.
+      goal: {
+        mouthLeft: 55,
+        mouthRight: 245,
+        crossbarY: 285,    // travesaño (Y mínima donde un tiro pasa por arriba)
+        groundY: 395       // línea de gol (Y de aterrizaje de tiros rasantes)
       },
-      // Mapeo zona → clave de animación (debe coincidir con claves en spritesheets)
-      zoneAnim: {
-        'high-left':   'gk_save_up_left',
-        'high-center': 'gk_save_center_up',
-        'high-right':  'gk_save_up_right',
-        'low-left':    'gk_save_down_left',
-        'low-center':  'gk_save_center_down',
-        'low-right':   'gk_save_down_right'
-      },
-      diveDuration: 300,
-      idleFrameRate: 6,
-      diveFrameRate: 30,
-      diveTimingPct: 0.5,
-      aiBias: 0.45      // probabilidad de leer correctamente la zona del balón
-    },
 
-    // Balón: parado sobre el punto penal (más adelante = más grande en perspectiva)
-    ball: {
-      image: "ball.png",
-      shadow: "ball_shadow.png",
-      startPos: { x: 155, y: 420 },   // más adelante (abajo) en perspectiva
-      startScale: 0.35,                // un poco más grande para reforzar cercanía
-      endScale: 0.08,                 // muy pequeño al llegar al arco (efecto lejanía)
-      shadowYOffset: 20,
-      shadowScale: 0.28,
+      // Arquero: chiquito, justo debajo del travesaño dentro del arco.
+      // 6 zonas de atajada (3 columnas × 2 filas).
+      keeper: {
+        position: { x: 150, y: 365 },   // pies en la línea de gol
+        scale: 0.32,                     // más pequeño para reforzar profundidad
 
-      // Spritesheet de rotación del balón
-      spritesheet: {
-        frameWidth:  172,   // cada frame es 172×174px (2px de gap lateral)
-        frameHeight: 174,
-        frameCount:  12
+        // Spritesheets del arquero: cada clave coincide con la animación en zoneAnim.
+        // frameWidth/frameHeight = tamaño de cada frame dentro del strip.
+        // frameCount = cantidad real de frames (Phaser los detecta automáticamente,
+        //              pero se declara aquí para que sea fácilmente tuneable).
+        spritesheets: {
+          idle: { file: 'gk_idle/Idle.png', frameWidth: 285, frameHeight: 386, frameCount: 7 },
+          gk_save_up_left: { file: 'gk_save_up_left/Up_Left.png', frameWidth: 284, frameHeight: 386, frameCount: 15 },
+          gk_save_up_right: { file: 'gk_save_up_right/Up_Right.png', frameWidth: 284, frameHeight: 386, frameCount: 15 },
+          gk_save_center_up: { file: 'gk_save_center_up/Center_Up.png', frameWidth: 284, frameHeight: 386, frameCount: 15 },
+          gk_save_down_left: { file: 'gk_save_down_left/Down_Left.png', frameWidth: 285, frameHeight: 386, frameCount: 14 },
+          gk_save_down_right: { file: 'gk_save_down_right/Down_Right.png', frameWidth: 285, frameHeight: 386, frameCount: 14 },
+          gk_save_center_down: { file: 'gk_save_center_down/Center_Down.png', frameWidth: 284, frameHeight: 386, frameCount: 15 }
+        },
+
+        // Offsets al tirarse a cada zona, relativos a position:
+        zoneOffsets: {
+          'high-left': { dx: -40, dy: 0 },
+          'high-center': { dx: 0, dy: 0 },
+          'high-right': { dx: 40, dy: 0 },
+          'low-left': { dx: -40, dy: 0 },
+          'low-center': { dx: 0, dy: 0 },
+          'low-right': { dx: 40, dy: 0 }
+        },
+        // Mapeo zona → clave de animación (debe coincidir con claves en spritesheets)
+        zoneAnim: {
+          'high-left': 'gk_save_up_left',
+          'high-center': 'gk_save_center_up',
+          'high-right': 'gk_save_up_right',
+          'low-left': 'gk_save_down_left',
+          'low-center': 'gk_save_center_down',
+          'low-right': 'gk_save_down_right'
+        },
+        diveDuration: 300,
+        preShiftX: 0,             // px de paso lateral previo al dive (0 = sin pre-movimiento)
+        preShiftDurationMs: 0,   // duración del paso lateral
+        idleFrameRate: 6,
+        diveFrameRate: 30,
+        diveTimingPct: 0.5,
+        aiBias: 0.45      // probabilidad de leer correctamente la zona del balón
       },
-      // Velocidad de giro según potencia (0–100)
-      rotation: {
-        minFrameRate:  6,   // potencia baja  → gira suave
-        maxFrameRate: 30    // potencia máxima → gira rápido
+
+      // Balón: parado sobre el punto penal (más adelante = más grande en perspectiva)
+      ball: {
+        image: "ball.png",
+        startPos: { x: 155, y: 420 },   // más adelante (abajo) en perspectiva
+        startScale: 0.35,                // un poco más grande para reforzar cercanía
+        endScale: 0.08,                 // muy pequeño al llegar al arco (efecto lejanía)
+
+        // Spritesheet de rotación del balón
+        spritesheet: {
+          frameWidth: 172,   // cada frame es 172×174px (2px de gap lateral)
+          frameHeight: 172,
+          frameCount: 12
+        },
+        // Velocidad de giro según potencia (0–100)
+        rotation: {
+          minFrameRate: 6,   // potencia baja  → gira suave
+          maxFrameRate: 30    // potencia máxima → gira rápido
+        },
+
+        // Timing del vuelo: Expo.easeOut = arranca muy rápido y desacelera bruscamente
+        // Opciones más suaves: 'Quint.easeOut', 'Quart.easeOut', 'Cubic.easeOut'
+        flightEase: 'Expo.easeOut'
+      },
+
+      // Flecha de dirección: arriba del balón apuntando al arco
+      arrow: {
+        position: { x: 140, y: 380 },
+        scale: 0.4,
+        angleRangeDeg: 40,
+        sweepHalfPeriodMs: 1200
+      },
+
+      // Barra de potencia (vertical, lado izquierdo, segmentada)
+      powerBar: {
+        x: 12, y: 410, w: 16, h: 170,
+        segments: 15,           // cantidad de segmentos
+        segmentGap: -1,          // px de separación entre segmentos
+        bgColor: 0x111111,
+        borderColor: 0x444444,
+        chargeRatePerMs: 0.13
+      },
+
+      // Mecánica del disparo
+      shot: {
+        totalShots: 5,
+        flightDurationMs: 700,
+        // Bandas de potencia (%) → altura del tiro
+        heightBands: { lowMax: 25, midMax: 55, highMax: 92, overMax: 100 },
+        // Y de llegada del balón por banda (dentro del arco: crossbarY=285..groundY=395).
+        //   low (rasante) → 390 (pegado al piso)
+        //   mid           → 350
+        //   high (al 9)   → 300 (cerca del travesaño, aún adentro)
+        //   over          → 250 (por encima del travesaño → miss)
+        landingY: { low: 340, mid: 310, high: 280, over: 250 },
+        // Umbral Y que separa filas "low" vs "high" del arquero
+        highLowThresholdY: 340,
+        saveRadiusX: 32,
+        directionSpreadX: 140,      // permite que los tiros lleguen a las esquinas del arco
+        wideAngleThresholdDeg: 37   // ángulos más allá de ±37° → fuera automático
+      },
+
+      // Botón PATEAR: ahora está en el DOM (#kick-btn). Config sólo guarda label y selector.
+      button: {
+        selector: "#kick-btn",
+        label: "PATEAR"
+      },
+
+      messages: { goal: "¡GOL!", save: "¡ATAJADA!", miss: "¡AFUERA!" },
+      messageDurationMs: 850,
+
+      ui: {
+        shotCounterSelector: "#shot-counter",
+        scoreSelector: "#score-value",
+        feedbackSelector: "#feedback-message",
+        kickBtnSelector: "#kick-btn",
+        arrowSelector: "#kick-arrow",
+        endOverlaySelector: "#end-overlay",
+        endScoreSelector: "#end-score",
+        endRestartSelector: "#end-restart"
+      },
+
+      onGameEnd: function (finalScore, totalShots) {
+        const overlay = document.querySelector(window.GAME_CONFIG.ui.endOverlaySelector);
+        const scoreEl = document.querySelector(window.GAME_CONFIG.ui.endScoreSelector);
+        if (scoreEl) scoreEl.textContent = finalScore + " DE " + totalShots;
+        if (overlay) overlay.style.display = 'flex';
+        console.log("Partida terminada:", finalScore, "/", totalShots);
       }
-    },
-
-    // Flecha de dirección: arriba del balón apuntando al arco
-    arrow: {
-      position: { x: 140, y: 380 },
-      scale: 0.4,
-      angleRangeDeg: 40,
-      sweepHalfPeriodMs: 900
-    },
-
-    // Barra de potencia (vertical, lado izquierdo)
-    powerBar: {
-      x: 12, y: 195, w: 12, h: 260,
-      bgColor: 0x1a1a1a, borderColor: 0xffffff,
-      fillLowColor: 0x00cc44,
-      fillMidColor: 0xffcc00,
-      fillHighColor: 0xff7700,
-      fillOverColor: 0xff1a1a,
-      chargeRatePerMs: 0.13
-    },
-
-    // Mecánica del disparo
-    shot: {
-      totalShots: 5,
-      flightDurationMs: 700,
-      // Bandas de potencia (%) → altura del tiro
-      heightBands: { lowMax: 25, midMax: 55, highMax: 92, overMax: 100 },
-      // Y de llegada del balón por banda (dentro del arco: crossbarY=285..groundY=395).
-      //   low (rasante) → 390 (pegado al piso)
-      //   mid           → 350
-      //   high (al 9)   → 300 (cerca del travesaño, aún adentro)
-      //   over          → 250 (por encima del travesaño → miss)
-      landingY: { low: 340, mid: 310, high: 280, over: 250 },
-      // Umbral Y que separa filas "low" vs "high" del arquero
-      highLowThresholdY: 340,
-      saveRadiusX: 32,
-      directionSpreadX: 140,      // permite que los tiros lleguen a las esquinas del arco
-      wideAngleThresholdDeg: 37   // ángulos más allá de ±37° → fuera automático
-    },
-
-    // Botón PATEAR: ahora está en el DOM (#kick-btn). Config sólo guarda label y selector.
-    button: {
-      selector: "#kick-btn",
-      label: "PATEAR"
-    },
-
-    messages: { goal: "¡GOL!", save: "¡ATAJADA!", miss: "¡AFUERA!" },
-    messageDurationMs: 850,
-
-    ui: {
-      shotCounterSelector: "#shot-counter",
-      scoreSelector: "#score-value",
-      feedbackSelector: "#feedback-message",
-      kickBtnSelector: "#kick-btn",
-      arrowSelector: "#kick-arrow",
-      endOverlaySelector: "#end-overlay",
-      endScoreSelector: "#end-score",
-      endRestartSelector: "#end-restart"
-    },
-
-    onGameEnd: function(finalScore, totalShots) {
-      const overlay = document.querySelector(window.GAME_CONFIG.ui.endOverlaySelector);
-      const scoreEl = document.querySelector(window.GAME_CONFIG.ui.endScoreSelector);
-      if (scoreEl) scoreEl.textContent = finalScore + " DE " + totalShots;
-      if (overlay) overlay.style.display = 'flex';
-      console.log("Partida terminada:", finalScore, "/", totalShots);
-    }
-  };
+    };
   </script>
   <script src="./main.js"></script>
 </head>
+
 <body>
   <div id="ui-bar">
     <div id="ui-shot" class="ui-cell">
@@ -184,12 +188,8 @@
 
     <div id="kick-arrow">
       <svg viewBox="0 0 80 140" width="100%" height="100%">
-        <polygon
-          points="40,6 74,58 54,58 54,130 26,130 26,58 6,58"
-          fill="#e6ff00"
-          stroke="#111"
-          stroke-width="4"
-          stroke-linejoin="round"/>
+        <polygon points="40,6 74,58 54,58 54,130 26,130 26,58 6,58" fill="#e6ff00" stroke="#111" stroke-width="4"
+          stroke-linejoin="round" />
       </svg>
     </div>
 
@@ -229,15 +229,32 @@
       font-size: 16px;
       font-weight: bold;
     }
-    .ui-cell { display: flex; flex-direction: column; align-items: center; }
-    .ui-label { color: #aaa; font-size: 12px; font-weight: normal; letter-spacing: 1px; }
-    #shot-counter, #score-value { font-size: 22px; color: #fff; }
+
+    .ui-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .ui-label {
+      color: #aaa;
+      font-size: 12px;
+      font-weight: normal;
+      letter-spacing: 1px;
+    }
+
+    #shot-counter,
+    #score-value {
+      font-size: 22px;
+      color: #fff;
+    }
 
     #game-container {
       position: relative;
       width: 300px;
       height: 600px;
     }
+
     #game-container canvas {
       width: 300px !important;
       height: 600px !important;
@@ -265,30 +282,46 @@
       letter-spacing: 1px;
       white-space: nowrap;
     }
+
     #feedback-message.visible {
       opacity: 1;
       transform: translate(-50%, -50%) scale(1);
     }
-    #feedback-message.goal { color: #00ff88; }
-    #feedback-message.save { color: #ff9900; }
-    #feedback-message.miss { color: #ff3333; }
+
+    #feedback-message.goal {
+      color: #00ff88;
+    }
+
+    #feedback-message.save {
+      color: #ff9900;
+    }
+
+    #feedback-message.miss {
+      color: #ff3333;
+    }
 
     /* Flecha de dirección (arriba del botón PATEAR) */
     #kick-arrow {
       position: absolute;
       left: 50%;
-      bottom: 72px;            /* sobre el botón (botón está a bottom:18 + 46h + gap) */
+      bottom: 72px;
+      /* sobre el botón (botón está a bottom:18 + 46h + gap) */
       width: 40px;
       height: 70px;
-      margin-left: -20px;      /* centrado horizontal */
-      transform-origin: 50% 100%;  /* pivote en la base para rotar como péndulo */
+      margin-left: -20px;
+      /* centrado horizontal */
+      transform-origin: 50% 100%;
+      /* pivote en la base para rotar como péndulo */
       transform: rotate(0deg);
       pointer-events: none;
       z-index: 5;
-      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
       transition: opacity 0.15s ease-out;
     }
-    #kick-arrow.hidden { opacity: 0; }
+
+    #kick-arrow.hidden {
+      opacity: 0;
+    }
 
     /* Botón PATEAR (dentro del canvas, parte inferior) */
     #kick-btn {
@@ -313,10 +346,12 @@
       z-index: 6;
       transition: transform 0.05s ease-out;
     }
+
     #kick-btn:active,
     #kick-btn.pressed {
       transform: translateX(-50%) scale(0.96);
     }
+
     #kick-btn[disabled] {
       opacity: 0.5;
       cursor: default;
@@ -338,27 +373,32 @@
       z-index: 10;
       font-weight: 900;
     }
+
     #end-title {
       font-size: 28px;
       color: #e6ff00;
       letter-spacing: 2px;
       margin-bottom: 20px;
     }
+
     #end-subtitle {
       font-size: 22px;
       letter-spacing: 2px;
     }
+
     #end-score {
       font-size: 54px;
       color: #e6ff00;
       margin: 8px 0;
-      text-shadow: 0 0 8px rgba(230,255,0,0.4);
+      text-shadow: 0 0 8px rgba(230, 255, 0, 0.4);
     }
+
     #end-goals-label {
       font-size: 22px;
       letter-spacing: 4px;
       margin-bottom: 40px;
     }
+
     #end-restart {
       background: #e6ff00;
       color: #111;
@@ -371,7 +411,10 @@
       cursor: pointer;
       font-family: inherit;
     }
-    #end-restart:active { transform: translateY(1px); }
+
+    #end-restart:active {
+      transform: translateY(1px);
+    }
   </style>
 
   <script>
@@ -388,4 +431,5 @@
     new Phaser.Game(config);
   </script>
 </body>
+
 </html>
