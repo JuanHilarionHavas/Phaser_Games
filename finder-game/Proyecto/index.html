@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -10,13 +11,18 @@
       src: url('assets/Fonts/Poppins-Regular.ttf') format('truetype');
       font-weight: 400;
     }
+
     @font-face {
       font-family: 'Poppins';
       src: url('assets/Fonts/Poppins-Bold.ttf') format('truetype');
       font-weight: 700;
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
     body {
       display: flex;
@@ -39,30 +45,46 @@
     /* ===== DOM HEADER (logo + tiempo) ===== */
     #dom-header {
       position: absolute;
-      top: 0; left: 0;
+      top: 0;
+      left: 0;
       width: 100%;
       z-index: 100;
       padding: 14px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      pointer-events: none; /* no bloquear la linterna */
+      pointer-events: none;
+      /* no bloquear la linterna */
     }
 
-    #logo-container img { height: 26px; width: auto; display: block; }
+    #logo-container img {
+      height: 26px;
+      width: auto;
+      display: block;
+    }
 
     #time-display {
       color: #fff;
       font-weight: 700;
       font-size: 16px;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
     }
 
     /* ===== CANVAS PHASER ===== */
-    #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-    #game-container canvas { display: block; }
+    #game-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #game-container canvas {
+      display: block;
+    }
   </style>
 </head>
+
 <body>
   <script>
     /**
@@ -86,15 +108,18 @@
       intruso: {
         key: "intruso",            // nombre interno de la textura en Phaser
         path: "Intruso.png",       // archivo del intruso (relativo a assetsPath)
-        scale: 0.18,               // escala del sprite (0.18 sobre el asset de 300px ~54px)
+        scale: 0.15,               // escala del sprite (0.18 sobre el asset de 300px ~54px)
         randomPosition: true,      // true = posicion aleatoria en spawnArea; false = usa fixedPosition
         fixedPosition: { x: 150, y: 330 }, // coordenadas fijas cuando randomPosition = false
         spawnArea: {               // rectangulo donde puede aparecer al azar (interior de la casa)
-          xMin: 70,                // limite izquierdo (px)
-          xMax: 245,               // limite derecho (px)
-          yMin: 150,               // limite superior (px) - debajo de la terraza exterior
-          yMax: 495                // limite inferior (px) - encima del jardin/entrada
-        }
+          xMin: 40,                // limite izquierdo (px)
+          xMax: 250,               // limite derecho (px)
+          yMin: 100,               // limite superior (px) - debajo de la terraza exterior
+          yMax: 480               // limite inferior (px) - encima del jardin/entrada
+        },
+        moving: true,             // true = el intruso se desplaza suave por el spawnArea
+        moveSpeed: 35,             // velocidad del desplazamiento en px por segundo
+        movePause: 400             // pausa en ms al llegar a cada punto antes de seguir
       },
 
       // ===== LINTERNA (overlay oscuro + mascara radial invertida) =====
@@ -102,7 +127,8 @@
         radius: 45,                // radio del haz de luz visible en px (igual al detectRadius)
         softness: 0.6,            // suavidad del borde del haz (0 = borde duro, 1 = muy difuso)
         darkness: 1,            // opacidad de la oscuridad fuera del haz (1 = negro total)
-        color: 0x000000            // color de la oscuridad (hex)
+        color: 0x000000,           // color de la oscuridad (hex)
+        mobileOffsetY: -70         // solo en tactil: sube el haz respecto al dedo para que no lo tape (negativo = arriba)
       },
 
       // ===== DETECCION (por proximidad cursor <-> intruso) =====
@@ -193,4 +219,5 @@
     window.game = new Phaser.Game(phaserConfig);
   </script>
 </body>
+
 </html>

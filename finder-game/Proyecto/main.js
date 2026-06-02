@@ -67,6 +67,9 @@ class GameScene extends Phaser.Scene {
     // Ayudas visuales de calibracion (solo si CFG.debug.enabled)
     this.createDebug();
 
+    // Si el intruso esta configurado para moverse, inicia su recorrido
+    this.startRoam();
+
     // Estado del cronometro (arranca segun CFG.timer.startOn)
     this.armTimerStart();
   }
@@ -136,22 +139,59 @@ class GameScene extends Phaser.Scene {
       y = I.fixedPosition.y;
     }
     this.intruder.setPosition(x, y);
-    if (this.detectCircle) this.detectCircle.setPosition(x, y); // mover el circulo de debug con el intruso
+  }
+
+  // ===== MOVIMIENTO DEL INTRUSO (si CFG.intruso.moving) =====
+  startRoam() {
+    if (!CFG.intruso.moving) return;
+    this.roamToNextPoint();
+  }
+
+  roamToNextPoint() {
+    if (this.found) return;
+    const a = CFG.intruso.spawnArea;
+    const tx = Phaser.Math.Between(a.xMin, a.xMax);
+    const ty = Phaser.Math.Between(a.yMin, a.yMax);
+    this.intruder.setFlipX(tx < this.intruder.x);   // mira hacia donde camina
+    const dist = Phaser.Math.Distance.Between(this.intruder.x, this.intruder.y, tx, ty);
+    const dur = Math.max(500, (dist / CFG.intruso.moveSpeed) * 1000);
+    this.roamTween = this.tweens.add({
+      targets: this.intruder,
+      x: tx, y: ty,
+      duration: dur,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        // pausa breve y sigue al siguiente punto
+        this.roamEvent = this.time.delayedCall(CFG.intruso.movePause, () => this.roamToNextPoint());
+      }
+    });
+  }
+
+  stopRoam() {
+    if (this.roamTween) { this.roamTween.stop(); this.roamTween = null; }
+    if (this.roamEvent) { this.roamEvent.remove(); this.roamEvent = null; }
   }
 
   update(time, delta) {
     const p = this.input.activePointer;
-    // Antes del primer movimiento el puntero esta en (0,0); deja el haz centrado para que no "salte" desde la esquina
+    // Posicion del haz. En tactil se desfasa hacia arriba para que el dedo no tape la zona iluminada.
+    let lx, ly;
     if (p.moveTime === 0) {
-      this.light.setPosition(this.W / 2, this.H / 2);
+      lx = this.W / 2; ly = this.H / 2;            // haz centrado antes del primer movimiento
     } else {
-      this.light.setPosition(p.worldX, p.worldY);
+      lx = p.worldX;
+      ly = p.worldY + (p.wasTouch ? CFG.flashlight.mobileOffsetY : 0);
     }
+    this.light.setPosition(lx, ly);
+
+    // En modo debug el circulo de deteccion sigue al intruso (util si se mueve)
+    if (this.detectCircle) this.detectCircle.setPosition(this.intruder.x, this.intruder.y);
 
     if (this.found || !this.timerStarted) return;
 
-    // Hay que mantener la luz sobre el intruso (detection.holdTime ms) antes de disparar la alarma
-    const d = Phaser.Math.Distance.Between(p.worldX, p.worldY, this.intruder.x, this.intruder.y);
+    // La deteccion usa la posicion del HAZ (no la del dedo), para que coincida con lo que se ve.
+    // Hay que mantener la luz sobre el intruso (detection.holdTime ms) antes de disparar la alarma.
+    const d = Phaser.Math.Distance.Between(lx, ly, this.intruder.x, this.intruder.y);
     if (d < CFG.detection.detectRadius) {
       this.holdTimer += delta;
       if (this.holdTimer >= CFG.detection.holdTime) {
@@ -164,6 +204,7 @@ class GameScene extends Phaser.Scene {
 
   handleFound() {
     this.found = true;
+    this.stopRoam();              // el intruso se queda quieto durante la alarma
     const a = CFG.alarm;
 
     // Guardar el tiempo (consultable despues, como en los otros juegos)
@@ -204,7 +245,9 @@ class GameScene extends Phaser.Scene {
     this.holdTimer = 0;
     this.overlay.setAlpha(this.overlayDarkness());
     this.alarmRect.setAlpha(0);
+    this.stopRoam();
     this.placeIntruder();
+    this.startRoam();
 
     if (window.resetTimer) window.resetTimer();
     this.armTimerStart();
