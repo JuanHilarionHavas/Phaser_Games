@@ -46,7 +46,7 @@ class GameScene extends Phaser.Scene {
     //  reveal y el setAlpha del reinicio sean consistentes)
     this.overlay = this.add.rectangle(0, 0, this.W, this.H, CFG.flashlight.color, 1)
       .setOrigin(0)
-      .setAlpha(CFG.flashlight.darkness)
+      .setAlpha(this.overlayDarkness())
       .setDepth(10);
 
     // Mascara invertida: el overlay se ve donde la luz es transparente; el haz revela el fondo
@@ -62,9 +62,33 @@ class GameScene extends Phaser.Scene {
 
     this.found = false;
     this.elapsedSeconds = 0;
+    this.holdTimer = 0;            // tiempo acumulado con la luz sobre el intruso (ms)
+
+    // Ayudas visuales de calibracion (solo si CFG.debug.enabled)
+    this.createDebug();
 
     // Estado del cronometro (arranca segun CFG.timer.startOn)
     this.armTimerStart();
+  }
+
+  // Opacidad de oscuridad efectiva (atenuada en modo debug para ver el plano)
+  overlayDarkness() {
+    return (CFG.debug && CFG.debug.enabled) ? CFG.debug.dimDarkness : CFG.flashlight.darkness;
+  }
+
+  // Dibuja ayudas visuales para calibrar (rectangulo del spawnArea y circulo de deteccion)
+  createDebug() {
+    const dbg = CFG.debug;
+    if (!dbg || !dbg.enabled) return;
+    if (dbg.showSpawnArea) {
+      const a = CFG.intruso.spawnArea;
+      this.add.rectangle(a.xMin, a.yMin, a.xMax - a.xMin, a.yMax - a.yMin, 0x00ff66, 0.18)
+        .setOrigin(0).setDepth(40).setStrokeStyle(2, 0x00ff66);
+    }
+    if (dbg.showDetectRadius) {
+      this.detectCircle = this.add.circle(this.intruder.x, this.intruder.y, CFG.detection.detectRadius, 0xff3333, 0.12)
+        .setStrokeStyle(2, 0xff3333).setDepth(40);
+    }
   }
 
   // Arranca el cronometro al cargar o con el primer movimiento del cursor.
@@ -112,9 +136,10 @@ class GameScene extends Phaser.Scene {
       y = I.fixedPosition.y;
     }
     this.intruder.setPosition(x, y);
+    if (this.detectCircle) this.detectCircle.setPosition(x, y); // mover el circulo de debug con el intruso
   }
 
-  update() {
+  update(time, delta) {
     const p = this.input.activePointer;
     // Antes del primer movimiento el puntero esta en (0,0); deja el haz centrado para que no "salte" desde la esquina
     if (p.moveTime === 0) {
@@ -125,9 +150,15 @@ class GameScene extends Phaser.Scene {
 
     if (this.found || !this.timerStarted) return;
 
+    // Hay que mantener la luz sobre el intruso (detection.holdTime ms) antes de disparar la alarma
     const d = Phaser.Math.Distance.Between(p.worldX, p.worldY, this.intruder.x, this.intruder.y);
     if (d < CFG.detection.detectRadius) {
-      this.handleFound();
+      this.holdTimer += delta;
+      if (this.holdTimer >= CFG.detection.holdTime) {
+        this.handleFound();
+      }
+    } else {
+      this.holdTimer = 0;          // si la luz sale del intruso, reinicia la cuenta
     }
   }
 
@@ -170,7 +201,8 @@ class GameScene extends Phaser.Scene {
 
   restartGame() {
     this.found = false;
-    this.overlay.setAlpha(CFG.flashlight.darkness);
+    this.holdTimer = 0;
+    this.overlay.setAlpha(this.overlayDarkness());
     this.alarmRect.setAlpha(0);
     this.placeIntruder();
 

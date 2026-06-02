@@ -100,14 +100,15 @@
       // ===== LINTERNA (overlay oscuro + mascara radial invertida) =====
       flashlight: {
         radius: 45,                // radio del haz de luz visible en px (igual al detectRadius)
-        softness: 0.45,            // suavidad del borde del haz (0 = borde duro, 1 = muy difuso)
-        darkness: 0.96,            // opacidad de la oscuridad fuera del haz (1 = negro total)
+        softness: 0.6,            // suavidad del borde del haz (0 = borde duro, 1 = muy difuso)
+        darkness: 1,            // opacidad de la oscuridad fuera del haz (1 = negro total)
         color: 0x000000            // color de la oscuridad (hex)
       },
 
       // ===== DETECCION (por proximidad cursor <-> intruso) =====
       detection: {
-        detectRadius: 45           // distancia en px cursor<->intruso para considerarlo "encontrado"
+        detectRadius: 45,          // distancia en px cursor<->intruso para considerarlo "encontrado"
+        holdTime: 1000             // ms que hay que mantener la luz sobre el intruso antes de la alarma (0 = inmediato)
       },
 
       // ===== ALARMA (efecto al encontrar al intruso) =====
@@ -130,7 +131,15 @@
       // ===== PRODUCCION / FIN DE JUEGO =====
       restartOnFound: true,        // true = reinicia tras encontrarlo (Proyecto); GWD lo pondra en false
       restartDelay: 1200,          // espera en ms antes de reiniciar, tras la alarma
-      onFoundCallback: null        // funcion(segundos) opcional - gancho para que el GWD/banner avance
+      onFoundCallback: null,       // funcion(segundos) opcional - gancho para que el GWD/banner avance
+
+      // ===== DEBUG (ayuda para calibrar; dejar enabled:false en produccion) =====
+      debug: {
+        enabled: false,            // true = muestra ayudas visuales para calibrar el juego
+        showSpawnArea: true,       // dibuja el rectangulo donde puede aparecer el intruso
+        showDetectRadius: true,    // dibuja el circulo de deteccion alrededor del intruso
+        dimDarkness: 0.15          // opacidad de la oscuridad en modo debug (baja para ver el plano)
+      }
     };
   </script>
 
