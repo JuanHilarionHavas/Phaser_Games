@@ -1,7 +1,7 @@
 class PenaltyScene extends Phaser.Scene {
 
     preload() {
-        const CFG = window.GAME_CONFIG;
+        const CFG = window.gwd.GAME_CONFIG;
         const base = CFG.assetsBase;
 
         this.load.image('bg', base + CFG.background.image);
@@ -65,7 +65,7 @@ class PenaltyScene extends Phaser.Scene {
     }
 
     create() {
-        const CFG = window.GAME_CONFIG;
+        const CFG = window.gwd.GAME_CONFIG;
         this.CFG = CFG;
 
         this.buildKeeperAnims();

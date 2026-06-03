@@ -53,9 +53,9 @@
 
         // Offsets al tirarse a cada zona, relativos a position:
         zoneOffsets: {
-          'high-left': { dx: -25, dy: -20 },
+          'high-left': { dx: -42, dy: -20 },   // mas lateral: el arquero alto alcanza la escuadra
           'high-center': { dx: 0, dy: -12 },
-          'high-right': { dx: 25, dy: -20 },
+          'high-right': { dx: 42, dy: -20 },    // mas lateral: el arquero alto alcanza la escuadra
           'low-left': { dx: -50, dy: 0 },
           'low-center': { dx: 0, dy: 0 },
           'low-right': { dx: 50, dy: 0 }
@@ -77,7 +77,9 @@
         idleFrameRate: 6,
         diveFrameRate: 30,
         diveTimingPct: 0.05,       // 0 = reacciona inmediatamente, 0.5 = espera mitad del vuelo
-        aiBias: 0.45      // probabilidad de leer correctamente la zona del balón
+        tellEnabled: true,   // el arquero anticipa un lado antes del tiro (telegrafia)
+        tellBias: 0.7,       // prob. de cumplir el tell (0.3 = finta)
+        tellShiftX: 15       // px que se inclina hacia el lado del tell durante IDLE
       },
 
       // Balón: parado sobre el punto penal (más adelante = más grande en perspectiva)
@@ -106,8 +108,6 @@
 
       // Flecha de dirección: arriba del balón apuntando al arco
       arrow: {
-        position: { x: 140, y: 380 },
-        scale: 0.4,
         angleRangeDeg: 40,
         sweepHalfPeriodMs: 1200
       },
@@ -128,18 +128,13 @@
         flightDurationMs: 550,     // ms que tarda el balón en llegar al arco (↓ = más rápido)
         // Bandas de potencia (%) → altura del tiro
         heightBands: { lowMax: 25, midMax: 55, highMax: 92, overMax: 100 },
-        // Y de llegada del balón por banda (dentro del arco: crossbarY=285..groundY=395).
-        //   low (rasante) → 390 (pegado al piso)
-        //   mid           → 350
-        //   high (al 9)   → 300 (cerca del travesaño, aún adentro)
-        //   over          → 250 (por encima del travesaño → miss)
-        landingY: { low: 340, mid: 310, high: 280, over: 250 },
-        // Umbral Y que separa filas "low" vs "high" del arquero
-        highLowThresholdY: 340,
-        saveRadiusX: 35,            // distancia en X para que el portero ataje
+        // Y de llegada por banda. Arco: crossbarY=285..groundY=395.
+        //   low 340 (rasante) · mid 310 · high 292 (dentro, con margen sobre 285) · over 250 (afuera)
+        landingY: { low: 340, mid: 310, high: 292, over: 250 },
+        saveRadiusX: 50,            // distancia en X para atajar (amplio: el arquero se estira a los lados)
         saveRadiusY: 35,            // distancia en Y para que el portero ataje
-        directionSpreadX: 140,      // permite que los tiros lleguen a las esquinas del arco
-        wideAngleThresholdDeg: 42   // ángulos más allá de ±37° → fuera automático
+        directionSpreadX: 175,      // dispersion horizontal del tiro segun el angulo de la flecha
+        wideAngleThresholdDeg: 36   // |angulo| >= 36 -> tiro "afuera" (este umbral es el que produce el fallo por costado)
       },
 
       // Botón PATEAR: ahora está en el DOM (#kick-btn). Config sólo guarda label y selector.
@@ -151,9 +146,15 @@
       messages: { goal: "¡GOL!", save: "¡ATAJADA!", miss: "¡AFUERA!" },
       messageDurationMs: 850,
 
+      // ===== DEBUG (ayudas de calibracion; dejar enabled:false en produccion) =====
+      debug: {
+        enabled: false,            // dibuja ayudas de calibracion sobre el campo
+        showGoalMouth: false,      // marco del arco logico (zona donde es gol)
+        showSaveZones: false,      // cajas de atajada de las 6 zonas del arquero (saveRadiusX/Y)
+        showLandingBands: false    // lineas Y de las bandas de altura (low/mid/high/over)
+      },
+
       ui: {
-        shotCounterSelector: "#shot-counter",
-        scoreSelector: "#score-value",
         feedbackSelector: "#feedback-message",
         kickBtnSelector: "#kick-btn",
         arrowSelector: "#kick-arrow",
@@ -175,25 +176,19 @@
 </head>
 
 <body>
-  <div id="ui-bar">
-    <div id="ui-shot" class="ui-cell">
-      <span class="ui-label">Tiro</span>
-      <span id="shot-counter">1/5</span>
-    </div>
-    <div id="ui-score" class="ui-cell">
-      <span class="ui-label">Goles</span>
-      <span id="score-value">0</span>
-    </div>
-  </div>
-
   <div id="game-container">
     <div id="feedback-message"></div>
 
+    <div id="scoreboard">
+      <div class="score-slot"><img class="score-icon" alt=""></div>
+      <div class="score-slot"><img class="score-icon" alt=""></div>
+      <div class="score-slot"><img class="score-icon" alt=""></div>
+      <div class="score-slot"><img class="score-icon" alt=""></div>
+      <div class="score-slot"><img class="score-icon" alt=""></div>
+    </div>
+
     <div id="kick-arrow">
-      <svg viewBox="0 0 80 140" width="100%" height="100%">
-        <polygon points="40,6 74,58 54,58 54,130 26,130 26,58 6,58" fill="#e6ff00" stroke="#111" stroke-width="4"
-          stroke-linejoin="round" />
-      </svg>
+      <div id="kick-arrow-tilt"><img src="assets/images/Flecha.png" alt=""></div>
     </div>
 
     <button id="kick-btn">PATEAR</button>
@@ -216,40 +211,6 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-    }
-
-    #ui-bar {
-      width: 300px;
-      margin: 8px auto;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      color: #e6ff00;
-      background: #181818;
-      border-radius: 10px;
-      padding: 8px 14px;
-      box-sizing: border-box;
-      font-size: 16px;
-      font-weight: bold;
-    }
-
-    .ui-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .ui-label {
-      color: #aaa;
-      font-size: 12px;
-      font-weight: normal;
-      letter-spacing: 1px;
-    }
-
-    #shot-counter,
-    #score-value {
-      font-size: 22px;
-      color: #fff;
     }
 
     #game-container {
@@ -303,45 +264,108 @@
       color: #ff3333;
     }
 
+    /* ===== Marcador de penaltis (BarraPuntos + Z's) ===== */
+    #scoreboard {
+      position: absolute;
+      top: 92px;
+      /* franja oscura bajo el logo (calibrar) */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 210px;
+      height: 60px;
+      /* ratio 349:99 */
+      background: url('assets/images/BarraPuntos.png') no-repeat center / 100% 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      /* separacion entre casillas (calibrar) */
+      padding: 0 16px;
+      /* margen lateral del container (calibrar) */
+      box-sizing: border-box;
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    .score-slot {
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .score-icon {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      opacity: 0;
+      transform: scale(0);
+      transition: transform 0.25s cubic-bezier(0.2, 1.3, 0.4, 1), opacity 0.2s ease-out;
+    }
+
+    .score-icon.shown {
+      opacity: 1;
+      transform: scale(1);
+    }
+
     /* Flecha de dirección (arriba del botón PATEAR) */
     #kick-arrow {
       position: absolute;
       left: 50%;
-      bottom: 72px;
-      /* sobre el botón (botón está a bottom:18 + 46h + gap) */
-      width: 40px;
-      height: 70px;
-      margin-left: -20px;
-      /* centrado horizontal */
+      bottom: 64px;
+      width: 120px;
+      height: 130px;
+      margin-left: -60px;
+      perspective: 420px;
+      /* contexto 3D para inclinar la flecha hacia el fondo */
       transform-origin: 50% 100%;
       /* pivote en la base para rotar como péndulo */
       transform: rotate(0deg);
       pointer-events: none;
       z-index: 5;
-      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
       transition: opacity 0.15s ease-out;
+    }
+
+    #kick-arrow-tilt {
+      position: absolute;
+      inset: 0;
+      transform-origin: 50% 100%;
+      transform: rotateX(58deg);
+      /* acuesta la flecha hacia el fondo: efecto a ras de pasto */
+    }
+
+    #kick-arrow img {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 120px;
+      /* tamano natural escalado (ratio 321:88) */
+      height: auto;
+      transform: translate(-50%, -50%) rotate(-90deg);
+      /* horizontal -> apunta arriba */
+      filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
     }
 
     #kick-arrow.hidden {
       opacity: 0;
     }
 
-    /* Botón PATEAR (dentro del canvas, parte inferior) */
+    /* Botón PATEAR (dentro del canvas, parte inferior) — usa BotonPatear.png */
     #kick-btn {
       position: absolute;
       left: 50%;
-      bottom: 18px;
+      bottom: -42px;
       transform: translateX(-50%);
-      width: 160px;
-      height: 46px;
-      background: #e6ff00;
-      color: #111;
-      border: 2px solid #111;
-      border-radius: 6px;
-      font-family: Arial, sans-serif;
-      font-size: 22px;
-      font-weight: 900;
-      letter-spacing: 1px;
+      width: 30%;
+      height: 30%;
+      /* ratio 251:122 */
+      background: url('assets/images/BotonPatear.png') no-repeat center / contain;
+      background-color: transparent;
+      border: none;
+      font-size: 0;
+      /* oculta el texto "PATEAR" del DOM (el asset ya lo trae) */
+      color: transparent;
       cursor: pointer;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
@@ -421,6 +445,27 @@
   </style>
 
   <script>
+    // ===== API del marcador (Phaser la llama al resolver cada tiro) =====
+    (function () {
+      const board = document.getElementById('scoreboard');
+      const icons = board ? Array.from(board.querySelectorAll('.score-icon')) : [];
+      const base = 'assets/images/';
+      window.markScoreboard = function (index, isGoal) {
+        const icon = icons[index];
+        if (!icon) return;
+        icon.src = base + (isGoal ? 'Anotado.png' : 'Fallido.png');
+        icon.classList.add('shown');
+      };
+      window.resetScoreboard = function () {
+        icons.forEach(function (icon) {
+          icon.classList.remove('shown');
+          icon.removeAttribute('src');
+        });
+      };
+      // Precargar iconos para que el primer "pop" no parpadee
+      ['Anotado.png', 'Fallido.png'].forEach(function (n) { const im = new Image(); im.src = base + n; });
+    })();
+
     const config = {
       type: Phaser.AUTO,
       width: 300,
@@ -429,6 +474,7 @@
       fps: { target: 60, forceSetTimeOut: true },
       backgroundColor: '#0a0a14',
       scene: PenaltyScene
+
     };
 
     new Phaser.Game(config);
