@@ -1,4 +1,4 @@
-const CFG = window.GAME_CONFIG;
+let CFG;
 
 /* =====================================================
  * PRELOADER: carga los assets
@@ -7,6 +7,7 @@ class PreloaderScene extends Phaser.Scene {
   constructor() { super('PreloaderScene'); }
 
   preload() {
+    CFG = window.gwd.GAME_CONFIG;
     this.load.setPath(CFG.assetsPath);
     this.load.image(CFG.background.key, CFG.background.path);
     // El intruso es un spritesheet (ciclo de carrera). Se carga como spritesheet siempre;

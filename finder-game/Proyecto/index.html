@@ -108,7 +108,14 @@
       intruso: {
         key: "intruso",            // nombre interno de la textura en Phaser
         path: "Intruso.png",       // archivo del intruso (relativo a assetsPath)
-        scale: 0.15,               // escala del sprite (0.18 sobre el asset de 300px ~54px)
+        scale: 0.15,               // escala del sprite (cada frame del spritesheet es 249x300)
+        animado: true,             // true = reproduce la animacion de carrera; false = frame estatico
+        spritesheet: {             // datos del spritesheet Intruso.png (2498x300, ciclo de carrera)
+          frameWidth: 249,         // ancho de cada frame (10 frames ~ 2498/10)
+          frameHeight: 300,        // alto de cada frame
+          frameCount: 10           // numero de frames del ciclo de carrera
+        },
+        strideDistance: 45,        // px que el intruso recorre por ciclo de carrera; el frameRate se deriva del moveSpeed (animacion acorde a la velocidad)
         randomPosition: true,      // true = posicion aleatoria en spawnArea; false = usa fixedPosition
         fixedPosition: { x: 150, y: 330 }, // coordenadas fijas cuando randomPosition = false
         spawnArea: {               // rectangulo donde puede aparecer al azar (interior de la casa)
@@ -118,7 +125,7 @@
           yMax: 480               // limite inferior (px) - encima del jardin/entrada
         },
         moving: true,             // true = el intruso se desplaza suave por el spawnArea
-        moveSpeed: 35,             // velocidad del desplazamiento en px por segundo
+        moveSpeed: 60,             // velocidad del desplazamiento en px por segundo
         movePause: 400             // pausa en ms al llegar a cada punto antes de seguir
       },
 
